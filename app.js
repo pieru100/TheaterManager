@@ -2,37 +2,48 @@
   "use strict";
 
   var DB_NAME = "theater-manager-db";
-  var DB_VERSION = 3;
-  var STORES = ["shows", "events", "resources", "rooms", "unavailability"];
+  var DB_VERSION = 6;
+  var STORES = ["shows", "events", "resources", "rooms", "unavailability", "categories", "types", "customFields"];
   var START_HOUR = 7;
   var END_HOUR = 24;
   var TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 
-  var RESOURCE_CATEGORIES = [
+  var DEFAULT_CATEGORIES = [
+    { id: "audiovisivi", label: "Audiovisivi" },
     { id: "elettricisti", label: "Elettricisti" },
     { id: "macchinisti", label: "Macchinisti" },
-    { id: "audiovisivi", label: "Audiovisivi" },
-    { id: "costumi", label: "Costumi" },
-    { id: "sala", label: "Sala" }
+    { id: "sartoria", label: "Sartoria" },
+    { id: "attrezzeria", label: "Attrezzeria" },
+    { id: "direzione_scena", label: "Direzione di Scena" }
   ];
 
-  var RESOURCE_GROUPS = [
-    {
-      type: "person",
-      label: "Persone",
-      categories: RESOURCE_CATEGORIES
-    },
-    {
-      type: "material",
-      label: "Materiali",
-      categories: RESOURCE_CATEGORIES
-    },
-    {
-      type: "expense",
-      label: "Spese",
-      categories: RESOURCE_CATEGORIES
-    }
+  var RESOURCE_CATEGORIES = DEFAULT_CATEGORIES.slice();
+
+  var DEFAULT_TYPES = [
+    { type: "person", label: "Persone" },
+    { type: "material", label: "Materiali" },
+    { type: "expense", label: "Spese" }
   ];
+
+  var RESOURCE_GROUPS = DEFAULT_TYPES.map(function (t) {
+    return { type: t.type, label: t.label, categories: RESOURCE_CATEGORIES };
+  });
+
+  function rebuildCategories() {
+    RESOURCE_CATEGORIES.length = 0;
+    DEFAULT_CATEGORIES.forEach(function (c) { RESOURCE_CATEGORIES.push(c); });
+    state.customCategories.forEach(function (c) { RESOURCE_CATEGORIES.push(c); });
+  }
+
+  function rebuildTypes() {
+    RESOURCE_GROUPS.length = 0;
+    DEFAULT_TYPES.forEach(function (t) {
+      RESOURCE_GROUPS.push({ type: t.type, label: t.label, categories: RESOURCE_CATEGORIES });
+    });
+    state.customTypes.forEach(function (t) {
+      RESOURCE_GROUPS.push({ type: t.id, label: t.label, categories: RESOURCE_CATEGORIES });
+    });
+  }
 
   var DEFAULT_ROOMS = [
     { id: "room-main", name: "Sala Grande", capacity: 820 },
@@ -41,23 +52,7 @@
     { id: "room-palco", name: "Palco Esterno", capacity: 420 }
   ];
 
-  var DEFAULT_RESOURCES = [
-    { id: "res-electricians", type: "person", category: "elettricisti", name: "Squadra elettricisti", notes: "" },
-    { id: "res-stage", type: "person", category: "macchinisti", name: "Squadra macchinisti", notes: "" },
-    { id: "res-av-tech", type: "person", category: "audiovisivi", name: "Tecnici audiovisivi", notes: "" },
-    { id: "res-costumes", type: "person", category: "costumi", name: "Sartoria costumi", notes: "" },
-    { id: "res-hall-team", type: "person", category: "sala", name: "Personale sala", notes: "" },
-    { id: "res-electric-kit", type: "material", category: "elettricisti", name: "Quadro elettrico mobile", notes: "" },
-    { id: "res-stage-kit", type: "material", category: "macchinisti", name: "Attrezzatura di palco", notes: "" },
-    { id: "res-av-kit", type: "material", category: "audiovisivi", name: "Impianto audio/video", notes: "" },
-    { id: "res-costume-rack", type: "material", category: "costumi", name: "Stand costumi", notes: "" },
-    { id: "res-hall-barriers", type: "material", category: "sala", name: "Transenne sala", notes: "" },
-    { id: "res-expense-electricians", type: "expense", category: "elettricisti", name: "Costo elettricisti", notes: "" },
-    { id: "res-expense-stage", type: "expense", category: "macchinisti", name: "Costo macchinisti", notes: "" },
-    { id: "res-expense-av", type: "expense", category: "audiovisivi", name: "Costo audiovisivi", notes: "" },
-    { id: "res-expense-costumes", type: "expense", category: "costumi", name: "Costo costumi", notes: "" },
-    { id: "res-expense-hall", type: "expense", category: "sala", name: "Costo sala", notes: "" }
-  ];
+  var DEFAULT_RESOURCES = [];
 
   var COLORS = [
     "#8d1f2d",
@@ -85,6 +80,9 @@
     resources: [],
     rooms: [],
     unavailability: [],
+    customCategories: [],
+    customTypes: [],
+    customFields: [],
     search: "",
     resourceGroupMode: "type",
     resourceTypeFilter: "",
@@ -98,14 +96,14 @@
 
   async function init() {
     collectElements();
-    populateResourceFilterOptions();
     bindEvents();
-    updateCategoryOptions();
 
     state.storage = await initStorage();
     el.storageStatus.textContent = state.storageLabel;
 
     await loadData();
+    populateResourceFilterOptions();
+    updateCategoryOptions();
     renderAll();
   }
 
@@ -117,6 +115,11 @@
     el.addShowButton = document.getElementById("addShowButton");
     el.showForm = document.getElementById("showForm");
     el.showResourceGrid = document.getElementById("showResourceGrid");
+    el.openResourcePicker = document.getElementById("openResourcePicker");
+    el.closeResourcePicker = document.getElementById("closeResourcePicker");
+    el.resourcePickerPanel = document.getElementById("resourcePickerPanel");
+    el.cancelShowForm = document.getElementById("cancelShowForm");
+    el.showCategoryResources = document.getElementById("showCategoryResources");
     el.showList = document.getElementById("showList");
     el.metrics = document.getElementById("metrics");
     el.periodTitle = document.getElementById("periodTitle");
@@ -127,9 +130,19 @@
     el.eventModal = document.getElementById("eventModal");
     el.eventForm = document.getElementById("eventForm");
     el.eventFormError = document.getElementById("eventFormError");
+    el.eventType = document.getElementById("eventType");
+    el.eventShowGroup = document.getElementById("eventShowGroup");
     el.eventShow = document.getElementById("eventShow");
+    el.eventDateGroup = document.getElementById("eventDateGroup");
     el.eventDateList = document.getElementById("eventDateList");
     el.addEventDateButton = document.getElementById("addEventDateButton");
+    el.eventProveTimeGroup = document.getElementById("eventProveTimeGroup");
+    el.eventProveDate = document.getElementById("eventProveDate");
+    el.eventProveFrom = document.getElementById("eventProveFrom");
+    el.eventProveTo = document.getElementById("eventProveTo");
+    el.eventRoomGroup = document.getElementById("eventRoomGroup");
+    el.eventProveResourceGroup = document.getElementById("eventProveResourceGroup");
+    el.eventProveResourceList = document.getElementById("eventProveResourceList");
     el.eventDetailModal = document.getElementById("eventDetailModal");
     el.eventDetailBody = document.getElementById("eventDetailBody");
     el.resourceScheduleModal = document.getElementById("resourceScheduleModal");
@@ -148,6 +161,24 @@
     el.cancelResourceForm = document.getElementById("cancelResourceForm");
     el.resourceType = document.getElementById("resourceType");
     el.resourceCategory = document.getElementById("resourceCategory");
+    el.addCategoryButton = document.getElementById("addCategoryButton");
+    el.categoryManager = document.getElementById("categoryManager");
+    el.customCategoryList = document.getElementById("customCategoryList");
+    el.addTypeButton = document.getElementById("addTypeButton");
+    el.typeManager = document.getElementById("typeManager");
+    el.customTypeList = document.getElementById("customTypeList");
+    el.resourceCustomFields = document.getElementById("resourceCustomFields");
+    el.personBuiltinFields = document.getElementById("personBuiltinFields");
+    el.resourcePhone = document.getElementById("resourcePhone");
+    el.resourceEmail = document.getElementById("resourceEmail");
+    el.resourceContract = document.getElementById("resourceContract");
+    el.contractDatesWrapper = document.getElementById("contractDatesWrapper");
+    el.resourceContractFrom = document.getElementById("resourceContractFrom");
+    el.resourceContractTo = document.getElementById("resourceContractTo");
+    el.materialBuiltinFields = document.getElementById("materialBuiltinFields");
+    el.resourceQuantity = document.getElementById("resourceQuantity");
+    el.addCustomFieldButton = document.getElementById("addCustomFieldButton");
+    el.customFieldList = document.getElementById("customFieldList");
     el.resourceCost = document.getElementById("resourceCost");
     el.resourceFilterType = document.getElementById("resourceFilterType");
     el.resourceFilterCategory = document.getElementById("resourceFilterCategory");
@@ -259,7 +290,36 @@
     });
 
     el.showForm.addEventListener("submit", handleShowSubmit);
+    document.querySelectorAll("[data-period-toggle]").forEach(function (toggle) {
+      toggle.addEventListener("change", function () {
+        var key = toggle.getAttribute("data-period-toggle");
+        var fields = document.querySelector('[data-period-fields="' + key + '"]');
+        if (fields) {
+          fields.classList.toggle("is-disabled", !toggle.checked);
+          Array.prototype.slice.call(fields.querySelectorAll("input")).forEach(function (input) {
+            input.disabled = !toggle.checked;
+            if (!toggle.checked) input.value = "";
+          });
+        }
+      });
+    });
+    el.openResourcePicker.addEventListener("click", function () {
+      el.resourcePickerPanel.classList.remove("hidden");
+    });
+    el.closeResourcePicker.addEventListener("click", function () {
+      el.resourcePickerPanel.classList.add("hidden");
+    });
+    el.cancelShowForm.addEventListener("click", function () {
+      resetShowForm();
+      setShowFormVisible(false);
+    });
     el.eventForm.addEventListener("submit", handleEventSubmit);
+    el.eventType.addEventListener("change", function () {
+      updateEventTypeVisibility();
+    });
+    el.eventShow.addEventListener("change", function () {
+      updateEventEndTimes();
+    });
     el.addEventDateButton.addEventListener("click", function () {
       addEventDateInput();
     });
@@ -274,7 +334,22 @@
     el.roomForm.addEventListener("submit", handleRoomSubmit);
     el.assignmentForm.addEventListener("submit", handleAssignmentSubmit);
 
-    el.resourceType.addEventListener("change", updateCategoryOptions);
+    el.resourceType.addEventListener("change", function () {
+      updateCategoryOptions();
+      updatePersonBuiltinFields();
+      renderResourceCustomFields();
+    });
+    el.resourcePhone.addEventListener("input", function () {
+      el.resourcePhone.value = el.resourcePhone.value.replace(/[^0-9]/g, "");
+    });
+    el.resourceContract.addEventListener("change", function () {
+      var isDeterminato = el.resourceContract.value === "determinato";
+      el.contractDatesWrapper.classList.toggle("hidden", !isDeterminato);
+      if (!isDeterminato) {
+        el.resourceContractFrom.value = "";
+        el.resourceContractTo.value = "";
+      }
+    });
     el.resetResourceForm.addEventListener("click", openNewResourceForm);
     el.resetRoomForm.addEventListener("click", openNewRoomForm);
     el.cancelResourceForm.addEventListener("click", function () {
@@ -287,6 +362,21 @@
       setRoomFormVisible(false);
     });
 
+    el.addCategoryButton.addEventListener("click", handleAddCategory);
+    el.customCategoryList.addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-delete-category]");
+      if (btn) deleteCategory(btn.getAttribute("data-delete-category"));
+    });
+    el.addTypeButton.addEventListener("click", handleAddType);
+    el.customTypeList.addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-delete-type]");
+      if (btn) deleteType(btn.getAttribute("data-delete-type"));
+    });
+    el.addCustomFieldButton.addEventListener("click", handleAddCustomField);
+    el.customFieldList.addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-delete-field]");
+      if (btn) deleteCustomField(btn.getAttribute("data-delete-field"));
+    });
     el.resourceList.addEventListener("click", handleResourceListClick);
     el.roomList.addEventListener("click", handleRoomListClick);
     el.showList.addEventListener("click", handleShowListClick);
@@ -444,6 +534,11 @@
     state.resources = (await state.storage.all("resources")).map(normalizeResource);
     state.rooms = (await state.storage.all("rooms")).map(normalizeRoom);
     state.unavailability = (await state.storage.all("unavailability")).map(normalizeUnavailability).filter(Boolean);
+    state.customCategories = await state.storage.all("categories");
+    state.customTypes = await state.storage.all("types");
+    state.customFields = await state.storage.all("customFields");
+    rebuildCategories();
+    rebuildTypes();
 
     if (!state.rooms.length) {
       state.rooms = DEFAULT_ROOMS.map(function (room) {
@@ -487,8 +582,9 @@
   }
 
   function normalizeEvent(event) {
-    return {
+    var normalized = {
       id: event.id || uid("event"),
+      eventType: event.eventType || "spettacolo",
       showId: event.showId || "",
       title: event.title || "",
       roomId: event.roomId || event.room || "",
@@ -498,6 +594,10 @@
       resourceIds: Array.isArray(event.resourceIds) ? event.resourceIds : [],
       notes: event.notes || ""
     };
+    if (event._proveTo) {
+      normalized._proveTo = event._proveTo;
+    }
+    return normalized;
   }
 
   function ensureEventShows() {
@@ -579,7 +679,7 @@
       return null;
     }
 
-    return {
+    var normalized = {
       id: period.id || uid("unavailable"),
       targetType: targetType,
       targetId: period.targetId,
@@ -587,6 +687,10 @@
       end: end.toISOString(),
       reason: period.reason || ""
     };
+    if (period._auto) {
+      normalized._auto = period._auto;
+    }
+    return normalized;
   }
 
   function sortData() {
@@ -619,6 +723,9 @@
     renderCalendar();
     renderShows();
     renderResources();
+    renderCustomTypes();
+    renderCustomCategories();
+    renderCustomFieldManager();
     renderRooms();
     renderArchive();
   }
@@ -733,7 +840,7 @@
 
       return '<button type="button" class="event-card" data-event-id="' + event.id + '" style="--top:' + top + '%;--height:' + height + '%;--left:' + left + '%;--width:' + width + '%;--event-color:' + eventColor(event) + '">' +
         '<strong>' + escapeHtml(eventTitle(event)) + '</strong>' +
-        '<span>' + escapeHtml(formatTime(start)) + ' - ' + escapeHtml(roomName(event.roomId)) + '</span>' +
+        '<span>' + escapeHtml(formatTime(start)) + (event.roomId ? ' - ' + escapeHtml(roomName(event.roomId)) : '') + '</span>' +
         '<span>' + eventResourceIds(event).length + ' risorse</span>' +
         '</button>';
     }).join("");
@@ -786,7 +893,7 @@
         visibleEvents.map(function (event) {
           return '<button type="button" class="month-event" data-event-id="' + event.id + '" style="--event-color:' + eventColor(event) + '">' +
             '<strong>' + escapeHtml(eventTitle(event)) + '</strong>' +
-            '<span>' + escapeHtml(formatTime(new Date(event.start))) + ' - ' + escapeHtml(roomName(event.roomId)) + '</span>' +
+            '<span>' + escapeHtml(formatTime(new Date(event.start))) + (event.roomId ? ' - ' + escapeHtml(roomName(event.roomId)) : '') + '</span>' +
             '</button>';
         }).join("") +
         (dayEvents.length > 3 ? '<div class="more-events">+' + (dayEvents.length - 3) + ' altri</div>' : "") +
@@ -824,14 +931,46 @@
     el.showList.innerHTML = shows.length ? shows.map(renderShowRow).join("") : '<div class="empty-state">Nessuno spettacolo registrato</div>';
   }
 
+  function formatPeriod(period) {
+    if (!period || (!period.from && !period.to)) return "";
+    var from = period.from ? period.from.split("-").reverse().join("/") : "…";
+    var to = period.to ? period.to.split("-").reverse().join("/") : "…";
+    return from + " – " + to;
+  }
+
   function renderShowRow(show) {
     var scheduledCount = state.events.filter(function (event) {
       return event.showId === show.id;
     }).length;
     var resourceCount = Array.isArray(show.resourceIds) ? show.resourceIds.length : 0;
 
+    var periodsHtml = "";
+    var periodLabels = [
+      { label: "Prove", data: show.periodoProve },
+      { label: "Allestimento", data: show.periodoAllestimento },
+      { label: "Spettacoli", data: show.periodoSpettacoli },
+      { label: "Tournée", data: show.periodoTournee }
+    ];
+    var periodParts = periodLabels.filter(function (p) { return formatPeriod(p.data); }).map(function (p) {
+      return '<span class="tag">' + escapeHtml(p.label) + ': ' + escapeHtml(formatPeriod(p.data)) + '</span>';
+    });
+    if (periodParts.length) {
+      periodsHtml = '<div class="row-periods">' + periodParts.join(" ") + '</div>';
+    }
+
+    var durationText = show.duration ? show.duration + ' min' : '';
+    var catResParts = [];
+    if (show.categoryResources) {
+      RESOURCE_CATEGORIES.forEach(function (cat) {
+        if (show.categoryResources[cat.id]) {
+          catResParts.push(cat.label + ': ' + show.categoryResources[cat.id]);
+        }
+      });
+    }
+    var catResHtml = catResParts.length ? '<div class="row-periods">' + catResParts.map(function (t) { return '<span class="tag">' + escapeHtml(t) + '</span>'; }).join(" ") + '</div>' : '';
+
     return '<div class="resource-row show-row">' +
-      '<div class="row-title"><strong>' + escapeHtml(show.name) + '</strong><span>' + resourceCount + ' risorse / ' + escapeHtml(formatEuro(show.cost)) + ' / ' + scheduledCount + ' date in calendario</span></div>' +
+      '<div class="row-title"><strong>' + escapeHtml(show.name) + '</strong><span>' + (durationText ? durationText + ' / ' : '') + resourceCount + ' risorse / ' + escapeHtml(formatEuro(show.cost)) + ' / ' + scheduledCount + ' date in calendario</span>' + periodsHtml + catResHtml + '</div>' +
       '<div class="row-actions">' +
       '<button class="button button-primary" type="button" data-schedule-show="' + show.id + '">Programma</button>' +
       '<button class="button button-muted button-icon" type="button" data-edit-show="' + show.id + '" aria-label="Modifica" title="Modifica">' +
@@ -917,8 +1056,32 @@
   function renderResourceRow(resource) {
     var engagementCount = resourceEngagements(resource.id).length;
     var unavailableCount = targetUnavailability("resource", resource.id).length;
+    var extraParts = [];
+    if (resource.type === "material" && resource.quantity) {
+      extraParts.push('Qtà: ' + resource.quantity);
+    }
+    if (resource.type === "person") {
+      if (resource.phone) extraParts.push('Tel: ' + escapeHtml(resource.phone));
+      if (resource.email) extraParts.push('Email: ' + escapeHtml(resource.email));
+      if (resource.contract) {
+        var contractLabel = resource.contract === "determinato" ? "Determinato" : "Indeterminato";
+        if (resource.contract === "determinato" && resource.contractPeriod) {
+          var cp = resource.contractPeriod;
+          if (cp.from || cp.to) contractLabel += ' (' + (cp.from || '?') + ' — ' + (cp.to || '?') + ')';
+        }
+        extraParts.push(contractLabel);
+      }
+    }
+    if (resource.customData) {
+      getFieldsForType(resource.type).forEach(function (f) {
+        if (resource.customData[f.id]) {
+          extraParts.push(escapeHtml(f.label) + ': ' + escapeHtml(resource.customData[f.id]));
+        }
+      });
+    }
+    var customText = extraParts.length ? ' / ' + extraParts.join(' / ') : '';
     return '<div class="resource-row">' +
-      '<div class="row-title"><strong>' + escapeHtml(resource.name) + '</strong><span>' + escapeHtml(groupLabel(resource.type)) + ' / ' + escapeHtml(categoryLabel(resource.category)) + ' / ' + engagementCount + ' impegni / ' + unavailableCount + ' Non disponibile</span></div>' +
+      '<div class="row-title"><strong>' + escapeHtml(resource.name) + '</strong><span>' + escapeHtml(groupLabel(resource.type)) + ' / ' + escapeHtml(categoryLabel(resource.category)) + customText + ' / ' + engagementCount + ' impegni / ' + unavailableCount + ' Non disponibile</span></div>' +
       '<div class="row-actions">' +
       '<button class="button button-primary" type="button" data-view-resource-schedule="' + resource.id + '">Impegni</button>' +
       '<button class="button button-muted" type="button" data-resource-unavailability="' + resource.id + '">Non disponibile</button>' +
@@ -979,18 +1142,15 @@
 
     el.upcomingList.innerHTML = upcoming.length ? upcoming.map(function (event) {
       return '<button type="button" class="upcoming-row" data-event-id="' + event.id + '">' +
-        '<strong>' + escapeHtml(eventTitle(event)) + '</strong><span>' + escapeHtml(formatDateTime(new Date(event.start))) + ' - ' + escapeHtml(roomName(event.roomId)) + '</span>' +
+        '<strong>' + escapeHtml(eventTitle(event)) + '</strong><span>' + escapeHtml(formatDateTime(new Date(event.start))) + (event.roomId ? ' - ' + escapeHtml(roomName(event.roomId)) : '') + '</span>' +
         '</button>';
     }).join("") : '<div class="empty-state">Nessuno spettacolo programmato</div>';
   }
 
   function openEventModal(eventId, dateValue, showId) {
-    if (!state.shows.length) {
-      window.alert("Aggiungi un nuovo spettacolo");
-      return;
-    }
-
     var event = eventId ? findEvent(eventId) : null;
+    var eventType = event ? (event.eventType || "spettacolo") : "spettacolo";
+
     var title = document.getElementById("eventModalTitle");
     var start = event ? new Date(event.start) : defaultEventDate(dateValue);
     var selectedShowId = event ? event.showId : (showId || (state.shows[0] ? state.shows[0].id : ""));
@@ -999,14 +1159,94 @@
     el.eventFormError.textContent = "";
     populateShowOptions(selectedShowId);
     populateRoomOptions();
-    renderEventDateInputs([start]);
+
+    el.eventType.value = eventType;
+
+    if (eventType === "prove" && event) {
+      var proveStart = new Date(event.start);
+      el.eventProveDate.value = dateKey(proveStart);
+      el.eventProveFrom.value = pad(proveStart.getHours()) + ":" + pad(proveStart.getMinutes());
+      if (event._proveTo) {
+        el.eventProveTo.value = event._proveTo;
+      } else {
+        var endMin = minutesOfDay(proveStart) + event.duration;
+        el.eventProveTo.value = pad(Math.floor(endMin / 60)) + ":" + pad(endMin % 60);
+      }
+      renderProveResourceCheckboxes(event.resourceIds || []);
+    } else {
+      renderEventDateInputs([start]);
+      if (dateValue) {
+        el.eventProveDate.value = dateValue;
+      }
+      renderProveResourceCheckboxes([]);
+    }
 
     document.getElementById("eventId").value = event ? event.id : "";
     el.eventShow.value = selectedShowId;
     document.getElementById("eventRoom").value = event ? event.roomId : (state.rooms[0] ? state.rooms[0].id : "");
 
+    updateEventTypeVisibility();
     title.textContent = event ? "Modifica calendario" : "Inserisci in calendario";
     showModal(el.eventModal);
+  }
+
+  function updateEventTypeVisibility() {
+    var type = el.eventType.value;
+    var isSpettacolo = type === "spettacolo";
+    var isProve = type === "prove";
+    var isTournee = type === "tournee";
+
+    el.eventShowGroup.classList.remove("hidden");
+    el.eventDateGroup.classList.toggle("hidden", !isSpettacolo);
+    el.eventProveTimeGroup.classList.toggle("hidden", !isProve);
+    el.eventRoomGroup.classList.toggle("hidden", isTournee);
+    el.eventProveResourceGroup.classList.toggle("hidden", !isProve);
+
+    // Update required/disabled attributes for hidden fields
+    el.eventShow.required = true;
+    el.eventShow.disabled = false;
+    var eventRoom = document.getElementById("eventRoom");
+    if (eventRoom) {
+      eventRoom.required = !isTournee;
+      eventRoom.disabled = isTournee;
+    }
+
+    // Disable datetime-local inputs in event date list when not spettacolo
+    Array.prototype.slice.call(el.eventDateList.querySelectorAll("[data-event-date]")).forEach(function (input) {
+      input.disabled = !isSpettacolo;
+    });
+
+    if (!state.shows.length) {
+      el.eventFormError.textContent = "Nessuno spettacolo presente. Aggiungi prima uno spettacolo.";
+    } else {
+      el.eventFormError.textContent = "";
+    }
+
+    if (isProve && !el.eventProveResourceList.children.length) {
+      renderProveResourceCheckboxes([]);
+    }
+  }
+
+  function renderProveResourceCheckboxes(selectedIds) {
+    var html = "";
+    RESOURCE_GROUPS.forEach(function (group) {
+      group.categories.forEach(function (category) {
+        var resources = state.resources.filter(function (r) {
+          return r.type === group.type && r.category === category.id;
+        });
+        if (!resources.length) return;
+        html += '<div class="picker-group"><strong>' + escapeHtml(group.label) + ' / ' + escapeHtml(category.label) + '</strong>';
+        resources.forEach(function (r) {
+          var checked = selectedIds.indexOf(r.id) >= 0 ? " checked" : "";
+          html += '<label class="checkbox-label"><input type="checkbox" value="' + r.id + '" data-prove-resource' + checked + '> ' + escapeHtml(r.name) + '</label>';
+        });
+        html += '</div>';
+      });
+    });
+    if (!html) {
+      html = '<p class="text-muted">Nessuna risorsa disponibile</p>';
+    }
+    el.eventProveResourceList.innerHTML = html;
   }
 
   function defaultEventDate(dateValue) {
@@ -1019,8 +1259,17 @@
     event.preventDefault();
     el.eventFormError.textContent = "";
 
+    var eventType = el.eventType.value;
     var id = document.getElementById("eventId").value || uid("event");
     var existing = findEvent(id);
+
+    if (eventType === "prove") {
+      return handleProveSubmit(id, existing);
+    } else if (eventType === "tournee") {
+      return handleTourneeSubmit(id, existing);
+    }
+
+    // Spettacolo (original logic)
     var show = findShow(el.eventShow.value);
     var roomId = document.getElementById("eventRoom").value;
     var starts = Array.prototype.slice.call(el.eventDateList.querySelectorAll("[data-event-date]")).map(function (input) {
@@ -1039,23 +1288,21 @@
 
       return {
         id: index === 0 ? id : uid("event"),
+        eventType: "spettacolo",
         showId: show.id,
         title: show.name,
         roomId: roomId,
         start: start.toISOString(),
         duration: candidateExisting ? candidateExisting.duration : 120,
         color: show.color,
-
-        // Ogni data in calendario conserva una propria copia delle risorse.
-        // Se sto modificando una data già esistente, mantengo le sue risorse.
-        // Se sto creando una nuova data, parto dalle risorse predefinite dello spettacolo.
         resourceIds: candidateExisting && Array.isArray(candidateExisting.resourceIds)
           ? candidateExisting.resourceIds.slice()
           : show.resourceIds.slice(),
-
         notes: candidateExisting ? candidateExisting.notes || "" : ""
       };
     });
+
+    var allResourceConflictDetails = [];
 
     for (var i = 0; i < candidates.length; i += 1) {
       var candidate = candidates[i];
@@ -1073,16 +1320,26 @@
       }
 
       var resourceConflicts = findResourceConflicts(candidate, candidate.resourceIds, ignoreId);
-      if (resourceConflicts.length) {
-        el.eventFormError.textContent = "Alcune risorse dello spettacolo sono gia occupate nello stesso orario.";
-        return;
-      }
+      resourceConflicts.forEach(function (conflictEvent) {
+        var shared = eventResourceIds(conflictEvent).filter(function (rid) {
+          return candidate.resourceIds.indexOf(rid) !== -1;
+        });
+        shared.forEach(function (rid) {
+          var r = findResource(rid);
+          allResourceConflictDetails.push((r ? r.name : rid) + " — occupata da \"" + eventTitle(conflictEvent) + "\" (" + formatDateTime(new Date(conflictEvent.start)) + ")");
+        });
+      });
 
       var resourceUnavailable = findResourceUnavailabilityConflicts(candidate, candidate.resourceIds);
-      if (resourceUnavailable.length) {
-        el.eventFormError.textContent = "Alcune risorse dello spettacolo non sono disponibili nello stesso orario.";
-        return;
-      }
+      resourceUnavailable.forEach(function (period) {
+        var r = findResource(period.targetId);
+        var name = r ? r.name : period.targetId;
+        if (period._contractConflict) {
+          allResourceConflictDetails.push(name + " — contratto determinato dal " + (period._contractFrom || "?") + " al " + (period._contractTo || "?") + ", evento fuori periodo");
+        } else {
+          allResourceConflictDetails.push(name + " — non disponibile (" + formatPeriodRange(period) + ")");
+        }
+      });
 
       for (var j = i + 1; j < candidates.length; j += 1) {
         if (eventsOverlap(candidate, candidates[j])) {
@@ -1092,8 +1349,157 @@
       }
     }
 
+    if (allResourceConflictDetails.length) {
+      showResourceConflictWarning(allResourceConflictDetails, function () {
+        Promise.all(candidates.map(upsertEvent)).then(function () {
+          state.cursor = new Date(candidates[0].start);
+          closeModals();
+          renderAll();
+        });
+      });
+      return;
+    }
+
     await Promise.all(candidates.map(upsertEvent));
     state.cursor = new Date(candidates[0].start);
+    closeModals();
+    renderAll();
+  }
+
+  function showResourceConflictWarning(details, onConfirm) {
+    el.eventFormError.innerHTML =
+      'Risorse in conflitto. ' +
+      '<button type="button" class="button-link" id="eventConflictVerify">Verifica</button>' +
+      ' | ' +
+      '<button type="button" class="button-link" id="eventConflictForce">Salva comunque</button>';
+
+    document.getElementById("eventConflictVerify").addEventListener("click", function () {
+      window.alert("Conflitti risorse:\n\n" + details.join("\n"));
+    });
+    document.getElementById("eventConflictForce").addEventListener("click", function () {
+      onConfirm();
+    });
+  }
+
+  async function handleProveSubmit(id, existing) {
+    var show = findShow(el.eventShow.value);
+    if (!show) {
+      el.eventFormError.textContent = "Seleziona uno spettacolo di riferimento.";
+      return;
+    }
+
+    var dateVal = el.eventProveDate.value;
+    var fromVal = el.eventProveFrom.value;
+    var toVal = el.eventProveTo.value;
+    var roomId = document.getElementById("eventRoom").value;
+
+    if (!dateVal || !fromVal || !toVal || !roomId) {
+      el.eventFormError.textContent = "Inserisci data, orario di inizio e fine, e sala.";
+      return;
+    }
+
+    var start = new Date(dateVal + "T" + fromVal);
+    var end = new Date(dateVal + "T" + toVal);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+      el.eventFormError.textContent = "L'orario di fine deve essere successivo a quello di inizio.";
+      return;
+    }
+
+    var duration = Math.round((end.getTime() - start.getTime()) / 60000);
+    var resourceIds = Array.prototype.slice.call(el.eventProveResourceList.querySelectorAll("[data-prove-resource]:checked")).map(function (cb) {
+      return cb.value;
+    });
+
+    var candidate = {
+      id: id,
+      eventType: "prove",
+      showId: show.id,
+      title: "Prove: " + show.name,
+      roomId: roomId,
+      start: start.toISOString(),
+      duration: duration,
+      _proveTo: toVal,
+      resourceIds: resourceIds,
+      color: "#6b7280",
+      notes: existing ? existing.notes || "" : ""
+    };
+
+    var ignoreId = existing ? existing.id : "";
+    var roomConflict = findRoomConflict(candidate, ignoreId);
+    if (roomConflict) {
+      el.eventFormError.textContent = "Sala occupata da " + eventTitle(roomConflict) + " alle " + formatTime(new Date(roomConflict.start)) + ".";
+      return;
+    }
+
+    var roomUnavailable = findRoomUnavailability(candidate);
+    if (roomUnavailable) {
+      el.eventFormError.textContent = "Sala non disponibile nel periodo selezionato.";
+      return;
+    }
+
+    var proveConflictDetails = [];
+    var resourceConflicts = findResourceConflicts(candidate, resourceIds, ignoreId);
+    resourceConflicts.forEach(function (conflictEvent) {
+      var shared = eventResourceIds(conflictEvent).filter(function (rid) {
+        return resourceIds.indexOf(rid) !== -1;
+      });
+      shared.forEach(function (rid) {
+        var r = findResource(rid);
+        proveConflictDetails.push((r ? r.name : rid) + " — occupata da \"" + eventTitle(conflictEvent) + "\" (" + formatDateTime(new Date(conflictEvent.start)) + ")");
+      });
+    });
+
+    var resourceUnavailable = findResourceUnavailabilityConflicts(candidate, resourceIds);
+    resourceUnavailable.forEach(function (period) {
+      var r = findResource(period.targetId);
+      var name = r ? r.name : period.targetId;
+      if (period._contractConflict) {
+        proveConflictDetails.push(name + " — contratto determinato dal " + (period._contractFrom || "?") + " al " + (period._contractTo || "?") + ", evento fuori periodo");
+      } else {
+        proveConflictDetails.push(name + " — non disponibile (" + formatPeriodRange(period) + ")");
+      }
+    });
+
+    if (proveConflictDetails.length) {
+      showResourceConflictWarning(proveConflictDetails, function () {
+        upsertEvent(candidate).then(function () {
+          state.cursor = new Date(candidate.start);
+          closeModals();
+          renderAll();
+        });
+      });
+      return;
+    }
+
+    await upsertEvent(candidate);
+    state.cursor = new Date(candidate.start);
+    closeModals();
+    renderAll();
+  }
+
+  async function handleTourneeSubmit(id, existing) {
+    var show = findShow(el.eventShow.value);
+    if (!show) {
+      el.eventFormError.textContent = "Seleziona uno spettacolo.";
+      return;
+    }
+
+    var start = existing ? new Date(existing.start) : defaultEventDate(null);
+
+    var candidate = {
+      id: id,
+      eventType: "tournee",
+      showId: show.id,
+      title: show.name + " (Tournée)",
+      start: start.toISOString(),
+      duration: existing ? existing.duration : 120,
+      resourceIds: existing && Array.isArray(existing.resourceIds) ? existing.resourceIds.slice() : show.resourceIds.slice(),
+      color: "#d97706",
+      notes: existing ? existing.notes || "" : ""
+    };
+
+    await upsertEvent(candidate);
+    state.cursor = new Date(candidate.start);
     closeModals();
     renderAll();
   }
@@ -1128,21 +1534,26 @@
         }).join("") + '</div></div>';
     }).join("");
 
+    var eyebrowLabel = event.eventType === "prove" ? "Prove" : (event.eventType === "tournee" ? "Tournée" : "Spettacolo");
+    var metaTags = '<span class="tag">' + escapeHtml(formatDateTime(new Date(event.start))) + '</span>' +
+      '<span class="tag">' + event.duration + ' min</span>';
+    if (event.roomId) {
+      metaTags += '<span class="tag">' + escapeHtml(roomName(event.roomId)) + '</span>';
+    }
+    if (show && event.eventType !== "prove") {
+      metaTags += '<span class="tag">' + escapeHtml(formatEuro(show.cost)) + '</span>';
+    }
+
     el.eventDetailBody.innerHTML =
       '<div class="detail-header">' +
-      '<p class="eyebrow">Spettacolo</p>' +
+      '<p class="eyebrow">' + eyebrowLabel + '</p>' +
       '<h3 id="eventDetailTitle">' + escapeHtml(eventTitle(event)) + '</h3>' +
-      '<div class="detail-meta">' +
-      '<span class="tag">' + escapeHtml(formatDateTime(new Date(event.start))) + '</span>' +
-      '<span class="tag">' + event.duration + ' min</span>' +
-      '<span class="tag">' + escapeHtml(roomName(event.roomId)) + '</span>' +
-      (show ? '<span class="tag">' + escapeHtml(formatEuro(show.cost)) + '</span>' : '') +
+      '<div class="detail-meta">' + metaTags + '</div>' +
       '</div>' +
-      '</div>' +
-      '<div class="detail-section"><h4>Descrizione</h4><p>' + escapeHtml(eventDescription(event) || "Nessuna descrizione") + '</p></div>' +
-      (grouped || '<div class="detail-section"><h4>Risorse</h4><p>Nessuna risorsa assegnata</p></div>') +
+      (event.eventType !== "tournee" ? '<div class="detail-section"><h4>Descrizione</h4><p>' + escapeHtml(eventDescription(event) || "Nessuna descrizione") + '</p></div>' : '') +
+      (event.eventType !== "tournee" ? (grouped || '<div class="detail-section"><h4>Risorse</h4><p>Nessuna risorsa assegnata</p></div>') : '') +
       '<div class="detail-actions">' +
-      '<button class="button button-primary" type="button" data-detail-action="assign" data-event-id="' + event.id + '">Gestisci risorse</button>' +
+      (event.eventType !== "tournee" ? '<button class="button button-primary" type="button" data-detail-action="assign" data-event-id="' + event.id + '">Gestisci risorse</button>' : '') +
       '<button class="button button-muted button-icon" type="button" data-detail-action="edit" data-event-id="' + event.id + '" aria-label="Modifica" title="Modifica">' +
         '<svg class="edit-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
           '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04c.39-.39.39-1.02 0-1.41l-2.51-2.51a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 2-1.66z"></path>' +
@@ -1174,7 +1585,7 @@
       closeModals();
       openAssignmentModal(eventId);
     } else if (action === "delete") {
-      if (window.confirm("Eliminare questo spettacolo?")) {
+      if (window.confirm("Eliminare questo evento?")) {
         await deleteEvent(eventId);
         closeModals();
         renderAll();
@@ -1202,7 +1613,7 @@
     el.assignmentSummary.innerHTML =
       '<strong>' + escapeHtml(eventTitle(event)) + '</strong>' +
       '<span> ' + escapeHtml(formatDateTime(new Date(event.start))) +
-      ' - ' + escapeHtml(roomName(event.roomId)) + '</span>';
+      (event.roomId ? ' - ' + escapeHtml(roomName(event.roomId)) : '') + '</span>';
     renderAssignmentGrid(event);
     showModal(el.assignmentModal);
   }
@@ -1226,6 +1637,8 @@
 
           if (conflict) {
             note = "Occupata: " + conflict.title + " (" + formatTime(new Date(conflict.start)) + ")";
+          } else if (unavailable && unavailable._contractConflict) {
+            note = "Fuori contratto (" + (unavailable._contractFrom || "?") + " — " + (unavailable._contractTo || "?") + ")";
           } else if (unavailable) {
             note = "Non disponibile: " + formatDateTime(new Date(unavailable.start)) + " - " + formatDateTime(new Date(unavailable.end));
           }
@@ -1265,7 +1678,10 @@
 
     var unavailable = findResourceUnavailabilityConflicts(scheduledEvent, selected);
     if (unavailable.length) {
-      el.assignmentError.textContent = "Una o piu risorse selezionate non sono disponibili nello stesso orario.";
+      var hasContract = unavailable.some(function (u) { return u._contractConflict; });
+      el.assignmentError.textContent = hasContract
+        ? "Una o più risorse selezionate sono fuori dal periodo di contratto."
+        : "Una o piu risorse selezionate non sono disponibili nello stesso orario.";
       return;
     }
 
@@ -1284,9 +1700,7 @@
     var id = document.getElementById("showId").value || uid("show");
     var existing = findShow(id);
     var name = document.getElementById("showName").value.trim();
-    var selected = Array.prototype.slice.call(el.showResourceGrid.querySelectorAll('input[name="showResourceIds"]:checked')).map(function (input) {
-      return input.value;
-    });
+    var selected = (state.showSelectedResourceIds || []).slice();
 
     if (!name) {
       return;
@@ -1296,9 +1710,15 @@
       id: id,
       name: name,
       description: document.getElementById("showDescription").value.trim(),
+      duration: parseInt(document.getElementById("showDuration").value, 10) || 0,
+      categoryResources: getShowCategoryResources(),
       resourceIds: selected,
       cost: Number(document.getElementById("showCost").value) || 0,
-      color: existing ? existing.color : defaultEventColor(name)
+      color: existing ? existing.color : defaultEventColor(name),
+      periodoProve: { from: document.getElementById("showProveFrom").value, to: document.getElementById("showProveTo").value },
+      periodoAllestimento: { from: document.getElementById("showAllestimentoFrom").value, to: document.getElementById("showAllestimentoTo").value },
+      periodoSpettacoli: { from: document.getElementById("showSpettacoliFrom").value, to: document.getElementById("showSpettacoliTo").value },
+      periodoTournee: { from: document.getElementById("showTourneeFrom").value, to: document.getElementById("showTourneeTo").value }
     };
 
     state.shows = state.shows.filter(function (item) {
@@ -1355,7 +1775,22 @@
     document.getElementById("showName").value = show.name;
     document.getElementById("showDescription").value = show.description || "";
     document.getElementById("showCost").value = show.cost || "";
+    document.getElementById("showProveFrom").value = (show.periodoProve && show.periodoProve.from) || "";
+    document.getElementById("showProveTo").value = (show.periodoProve && show.periodoProve.to) || "";
+    document.getElementById("showAllestimentoFrom").value = (show.periodoAllestimento && show.periodoAllestimento.from) || "";
+    document.getElementById("showAllestimentoTo").value = (show.periodoAllestimento && show.periodoAllestimento.to) || "";
+    document.getElementById("showSpettacoliFrom").value = (show.periodoSpettacoli && show.periodoSpettacoli.from) || "";
+    document.getElementById("showSpettacoliTo").value = (show.periodoSpettacoli && show.periodoSpettacoli.to) || "";
+    document.getElementById("showTourneeFrom").value = (show.periodoTournee && show.periodoTournee.from) || "";
+    document.getElementById("showTourneeTo").value = (show.periodoTournee && show.periodoTournee.to) || "";
+    document.getElementById("showDuration").value = show.duration || "";
+    setPeriodToggle("prove", show.periodoProve && (show.periodoProve.from || show.periodoProve.to));
+    setPeriodToggle("allestimento", show.periodoAllestimento && (show.periodoAllestimento.from || show.periodoAllestimento.to));
+    setPeriodToggle("spettacoli", show.periodoSpettacoli && (show.periodoSpettacoli.from || show.periodoSpettacoli.to));
+    setPeriodToggle("tournee", show.periodoTournee && (show.periodoTournee.from || show.periodoTournee.to));
+    renderShowCategoryResources(show.categoryResources || {});
     renderShowResourceGrid(show.resourceIds);
+    el.resourcePickerPanel.classList.remove("hidden");
     document.getElementById("showName").focus();
   }
 
@@ -1386,13 +1821,20 @@
     event.preventDefault();
 
     var id = document.getElementById("resourceId").value || uid("res");
+    var personData = getPersonBuiltinData();
     var resource = {
       id: id,
       type: el.resourceType.value,
       category: el.resourceCategory.value,
       name: document.getElementById("resourceName").value.trim(),
       notes: document.getElementById("resourceNotes").value.trim(),
-      cost: el.resourceCost ? Number(el.resourceCost.value) || 0 : 0
+      cost: el.resourceCost ? Number(el.resourceCost.value) || 0 : 0,
+      phone: personData.phone || "",
+      email: personData.email || "",
+      contract: personData.contract || "",
+      contractPeriod: personData.contractPeriod || null,
+      quantity: el.resourceType.value === "material" ? (parseInt(el.resourceQuantity.value, 10) || 0) : 0,
+      customData: getResourceCustomFieldValues()
     };
 
     if (!resource.name) {
@@ -1405,9 +1847,57 @@
     state.resources.push(resource);
     sortData();
     await state.storage.put("resources", resource);
+    await syncContractUnavailability(resource);
     resetResourceForm();
     setResourceFormVisible(false);
     renderAll();
+  }
+
+  async function syncContractUnavailability(resource) {
+    // Rimuovi le indisponibilità automatiche precedenti per questa risorsa
+    var oldAuto = state.unavailability.filter(function (p) {
+      return p.targetType === "resource" && p.targetId === resource.id && p._auto === "contract";
+    });
+    for (var i = 0; i < oldAuto.length; i++) {
+      state.unavailability = state.unavailability.filter(function (p) { return p.id !== oldAuto[i].id; });
+      await state.storage.delete("unavailability", oldAuto[i].id);
+    }
+
+    // Se contratto determinato con date, crea le indisponibilità fuori periodo
+    if (resource.type === "person" && resource.contract === "determinato" && resource.contractPeriod) {
+      var cp = resource.contractPeriod;
+      var periods = [];
+
+      if (cp.from) {
+        periods.push({
+          id: uid("unavailable"),
+          targetType: "resource",
+          targetId: resource.id,
+          start: new Date("2000-01-01T00:00:00").toISOString(),
+          end: new Date(cp.from + "T00:00:00").toISOString(),
+          reason: "Contratto",
+          _auto: "contract"
+        });
+      }
+
+      if (cp.to) {
+        periods.push({
+          id: uid("unavailable"),
+          targetType: "resource",
+          targetId: resource.id,
+          start: new Date(cp.to + "T23:59:59").toISOString(),
+          end: new Date("2099-12-31T23:59:59").toISOString(),
+          reason: "Contratto",
+          _auto: "contract"
+        });
+      }
+
+      for (var j = 0; j < periods.length; j++) {
+        state.unavailability.push(periods[j]);
+        await state.storage.put("unavailability", periods[j]);
+      }
+    }
+    sortData();
   }
 
   async function handleRoomSubmit(event) {
@@ -1488,7 +1978,7 @@
   function renderEngagementRow(event) {
     return '<button type="button" class="engagement-row" data-event-id="' + event.id + '" style="--event-color:' + eventColor(event) + '">' +
       '<span><strong>' + escapeHtml(formatDateTime(new Date(event.start))) + '</strong><span>' + escapeHtml(formatTimeRange(event)) + ' / ' + event.duration + ' min</span></span>' +
-      '<span><strong>' + escapeHtml(eventTitle(event)) + '</strong><span>' + escapeHtml(roomName(event.roomId)) + '</span></span>' +
+      '<span><strong>' + escapeHtml(eventTitle(event)) + '</strong><span>' + (event.roomId ? escapeHtml(roomName(event.roomId)) : '') + '</span></span>' +
       '<span class="tag">' + escapeHtml(eventStatusLabel(event)) + '</span>' +
       '</button>';
   }
@@ -1577,7 +2067,9 @@
   function renderUnavailabilityList() {
     var targetType = document.getElementById("unavailabilityTargetType").value;
     var targetId = document.getElementById("unavailabilityTargetId").value;
-    var periods = targetUnavailability(targetType, targetId);
+    var periods = targetUnavailability(targetType, targetId).filter(function (p) {
+      return p._auto !== "contract";
+    });
 
     el.unavailabilityList.innerHTML = periods.length ? periods.map(renderUnavailabilityRow).join("") : '<div class="empty-state">Nessun periodo registrato</div>';
   }
@@ -1591,12 +2083,12 @@
         '<svg class="edit-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
           '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04c.39-.39.39-1.02 0-1.41l-2.51-2.51a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 2-1.66z"></path>' +
         '</svg>' +
-      '</button>' +      
+      '</button>' +
       '<button class="button button-danger button-icon" type="button" data-delete-unavailability="' + period.id + '" aria-label="Elimina" title="Elimina">' +
         '<svg class="trash-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
           '<path d="M9 3h6l1 2h5v2H3V5h5l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h12l-1 12H7L6 9z"></path>' +
         '</svg>' +
-      '</button>' +      
+      '</button>' +
       '</div>' +
       '</div>';
   }
@@ -1658,6 +2150,14 @@
     if (el.resourceCost) {
       el.resourceCost.value = resource.cost || "";
     }
+    updatePersonBuiltinFields({
+      phone: resource.phone,
+      email: resource.email,
+      contract: resource.contract,
+      contractPeriod: resource.contractPeriod,
+      quantity: resource.quantity
+    });
+    renderResourceCustomFields(resource.customData || {});
     document.getElementById("resourceName").focus();
   }
 
@@ -1822,12 +2322,31 @@
       el.resourceCost.value = "";
     }
     updateCategoryOptions();
+    updatePersonBuiltinFields();
+    renderResourceCustomFields();
   }
 
   function resetShowForm() {
     el.showForm.reset();
     document.getElementById("showId").value = "";
+    state.showSelectedResourceIds = [];
+    setPeriodToggle("prove", true);
+    setPeriodToggle("allestimento", true);
+    setPeriodToggle("spettacoli", true);
+    setPeriodToggle("tournee", true);
+    renderShowCategoryResources({});
     renderShowResourceGrid([]);
+  }
+
+  function setPeriodToggle(key, enabled) {
+    var toggle = document.querySelector('[data-period-toggle="' + key + '"]');
+    var fields = document.querySelector('[data-period-fields="' + key + '"]');
+    if (!toggle || !fields) return;
+    toggle.checked = !!enabled;
+    fields.classList.toggle("is-disabled", !enabled);
+    Array.prototype.slice.call(fields.querySelectorAll("input")).forEach(function (input) {
+      input.disabled = !enabled;
+    });
   }
 
   function openNewShowForm() {
@@ -1841,8 +2360,34 @@
     el.addShowButton.setAttribute("aria-expanded", visible ? "true" : "false");
   }
 
+  function renderShowCategoryResources(categoryResources) {
+    var data = categoryResources || {};
+    var html = RESOURCE_CATEGORIES.map(function (cat) {
+      var val = data[cat.id] || 0;
+      return '<label>' + escapeHtml(cat.label) +
+        '<input type="number" min="0" step="1" inputmode="numeric" name="showCatRes_' + cat.id + '" value="' + val + '">' +
+        '<span class="cat-count-badge" data-cat-badge="' + cat.id + '">&nbsp;</span>' +
+        '</label>';
+    }).join("");
+    el.showCategoryResources.innerHTML = html;
+    el.showCategoryResources.addEventListener("input", updateShowCategoryCounts);
+  }
+
+  function getShowCategoryResources() {
+    var data = {};
+    RESOURCE_CATEGORIES.forEach(function (cat) {
+      var input = document.querySelector('input[name="showCatRes_' + cat.id + '"]');
+      var val = input ? parseInt(input.value, 10) || 0 : 0;
+      if (val > 0) {
+        data[cat.id] = val;
+      }
+    });
+    return data;
+  }
+
   function renderShowResourceGrid(selectedIds) {
-    var selected = selectedIds || [];
+    state.showSelectedResourceIds = (selectedIds || []).slice();
+    var selected = state.showSelectedResourceIds;
     var html = "";
 
     RESOURCE_GROUPS.forEach(function (group) {
@@ -1856,7 +2401,7 @@
       html += '<section class="assignment-group"><h4>' + escapeHtml(group.label) + '</h4>';
       html += sortResourceRows(resources).map(function (resource) {
         return '<label class="resource-option">' +
-          '<input type="checkbox" name="showResourceIds" value="' + resource.id + '"' + (selected.indexOf(resource.id) !== -1 ? " checked" : "") + '>' +
+          '<input type="checkbox" name="showResourceIds" value="' + resource.id + '" data-category="' + resource.category + '"' + (selected.indexOf(resource.id) !== -1 ? " checked" : "") + '>' +
           '<span>' + escapeHtml(resource.name) + '<small>' + escapeHtml(categoryLabel(resource.category)) + '</small></span>' +
           '</label>';
       }).join("");
@@ -1864,6 +2409,43 @@
     });
 
     el.showResourceGrid.innerHTML = html || '<div class="empty-state">Nessuna risorsa disponibile</div>';
+    el.resourcePickerPanel.classList.add("hidden");
+
+    el.showResourceGrid.addEventListener("change", function () {
+      state.showSelectedResourceIds = Array.prototype.slice.call(
+        el.showResourceGrid.querySelectorAll('input[name="showResourceIds"]:checked')
+      ).map(function (input) { return input.value; });
+      updateShowCategoryCounts();
+    });
+
+    updateShowCategoryCounts();
+  }
+
+  function updateShowCategoryCounts() {
+    var needed = getShowCategoryResources();
+    var assigned = {};
+    (state.showSelectedResourceIds || []).forEach(function (id) {
+      var resource = findResource(id);
+      if (resource) {
+        assigned[resource.category] = (assigned[resource.category] || 0) + 1;
+      }
+    });
+
+    RESOURCE_CATEGORIES.forEach(function (cat) {
+      var badge = document.querySelector('[data-cat-badge="' + cat.id + '"]');
+      if (!badge) return;
+      var req = needed[cat.id] || 0;
+      var asg = assigned[cat.id] || 0;
+      var remaining = req - asg;
+
+      if (req > 0) {
+        badge.textContent = '(' + asg + '/' + req + (remaining > 0 ? ' — da assegnare ' + remaining : ' ✓') + ')';
+        badge.className = remaining > 0 ? 'cat-count-badge cat-count-pending' : 'cat-count-badge cat-count-ok';
+      } else {
+        badge.innerHTML = '&nbsp;';
+        badge.className = 'cat-count-badge';
+      }
+    });
   }
 
   function openNewResourceForm() {
@@ -1901,6 +2483,18 @@
     el.resourceFilterCategory.innerHTML = '<option value="">Tutte le categorie</option>' + RESOURCE_CATEGORIES.map(function (category) {
       return '<option value="' + category.id + '">' + escapeHtml(category.label) + '</option>';
     }).join("");
+
+    populateTypeSelect();
+  }
+
+  function populateTypeSelect() {
+    var prevValue = el.resourceType.value;
+    el.resourceType.innerHTML = RESOURCE_GROUPS.map(function (group) {
+      return '<option value="' + group.type + '">' + escapeHtml(group.label) + '</option>';
+    }).join("");
+    if (prevValue && el.resourceType.querySelector('option[value="' + prevValue + '"]')) {
+      el.resourceType.value = prevValue;
+    }
   }
 
   function updateCategoryOptions() {
@@ -1909,9 +2503,264 @@
       return item.type === type;
     })[0] || RESOURCE_GROUPS[0];
 
+    var prevValue = el.resourceCategory.value;
     el.resourceCategory.innerHTML = group.categories.map(function (category) {
       return '<option value="' + category.id + '">' + escapeHtml(category.label) + '</option>';
     }).join("");
+    if (prevValue && el.resourceCategory.querySelector('option[value="' + prevValue + '"]')) {
+      el.resourceCategory.value = prevValue;
+    }
+  }
+
+  async function handleAddCategory() {
+    var name = window.prompt("Nome della nuova categoria:");
+    if (!name || !name.trim()) return;
+    name = name.trim();
+
+    var id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    if (!id) return;
+
+    var exists = RESOURCE_CATEGORIES.some(function (c) { return c.id === id; });
+    if (exists) {
+      window.alert("Esiste già una categoria con questo nome.");
+      return;
+    }
+
+    var cat = { id: id, label: name };
+    state.customCategories.push(cat);
+    await state.storage.put("categories", cat);
+    rebuildCategories();
+    populateResourceFilterOptions();
+    updateCategoryOptions();
+    el.resourceCategory.value = id;
+    renderAll();
+  }
+
+  function renderCustomTypes() {
+    if (!state.customTypes.length) {
+      el.typeManager.classList.add("hidden");
+      return;
+    }
+    el.typeManager.classList.remove("hidden");
+    el.customTypeList.innerHTML = state.customTypes.map(function (t) {
+      return '<span class="tag">' + escapeHtml(t.label) +
+        ' <button type="button" class="cat-delete-btn" data-delete-type="' + t.id + '" aria-label="Elimina" title="Elimina tipo">&times;</button>' +
+        '</span>';
+    }).join("");
+  }
+
+  async function handleAddType() {
+    var name = window.prompt("Nome del nuovo tipo:");
+    if (!name || !name.trim()) return;
+    name = name.trim();
+
+    var id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    if (!id) return;
+
+    var exists = RESOURCE_GROUPS.some(function (g) { return g.type === id; });
+    if (exists) {
+      window.alert("Esiste già un tipo con questo nome.");
+      return;
+    }
+
+    var t = { id: id, label: name };
+    state.customTypes.push(t);
+    await state.storage.put("types", t);
+    rebuildTypes();
+    populateResourceFilterOptions();
+    populateTypeSelect();
+    updateCategoryOptions();
+    el.resourceType.value = id;
+    renderAll();
+  }
+
+  async function deleteType(typeId) {
+    var inUse = state.resources.some(function (r) { return r.type === typeId; });
+    if (inUse) {
+      window.alert("Tipo in uso da una o più risorse. Rimuovi prima le risorse associate.");
+      return;
+    }
+    if (!window.confirm("Eliminare questo tipo personalizzato?")) return;
+
+    state.customTypes = state.customTypes.filter(function (t) { return t.id !== typeId; });
+    await state.storage.delete("types", typeId);
+    rebuildTypes();
+    populateResourceFilterOptions();
+    populateTypeSelect();
+    updateCategoryOptions();
+    renderAll();
+  }
+
+  function renderCustomCategories() {
+    if (!state.customCategories.length) {
+      el.categoryManager.classList.add("hidden");
+      return;
+    }
+    el.categoryManager.classList.remove("hidden");
+    el.customCategoryList.innerHTML = state.customCategories.map(function (cat) {
+      return '<span class="tag">' + escapeHtml(cat.label) +
+        ' <button type="button" class="cat-delete-btn" data-delete-category="' + cat.id + '" aria-label="Elimina" title="Elimina categoria">&times;</button>' +
+        '</span>';
+    }).join("");
+  }
+
+  async function deleteCategory(categoryId) {
+    var inUse = state.resources.some(function (r) { return r.category === categoryId; });
+    if (inUse) {
+      window.alert("Categoria in uso da una o più risorse. Rimuovi prima le risorse associate.");
+      return;
+    }
+    if (!window.confirm("Eliminare questa categoria personalizzata?")) return;
+
+    state.customCategories = state.customCategories.filter(function (c) { return c.id !== categoryId; });
+    await state.storage.delete("categories", categoryId);
+    rebuildCategories();
+    populateResourceFilterOptions();
+    updateCategoryOptions();
+    renderAll();
+  }
+
+  // --- Campi personalizzati per tipo ---
+
+  function getFieldsForType(type) {
+    return state.customFields.filter(function (f) { return f.type === type; });
+  }
+
+  function updatePersonBuiltinFields(data) {
+    var isPerson = el.resourceType.value === "person";
+    var isMaterial = el.resourceType.value === "material";
+    el.personBuiltinFields.classList.toggle("hidden", !isPerson);
+    el.materialBuiltinFields.classList.toggle("hidden", !isMaterial);
+    if (!isPerson) {
+      el.resourcePhone.value = "";
+      el.resourceEmail.value = "";
+      el.resourceContract.value = "indeterminato";
+      el.resourceContractFrom.value = "";
+      el.resourceContractTo.value = "";
+      el.contractDatesWrapper.classList.add("hidden");
+    }
+    if (!isMaterial) {
+      el.resourceQuantity.value = "";
+    }
+    if (data && isPerson) {
+      el.resourcePhone.value = data.phone || "";
+      el.resourceEmail.value = data.email || "";
+      el.resourceContract.value = data.contract || "indeterminato";
+      if (data.contract === "determinato") {
+        el.contractDatesWrapper.classList.remove("hidden");
+        el.resourceContractFrom.value = (data.contractPeriod && data.contractPeriod.from) || "";
+        el.resourceContractTo.value = (data.contractPeriod && data.contractPeriod.to) || "";
+      } else {
+        el.contractDatesWrapper.classList.add("hidden");
+        el.resourceContractFrom.value = "";
+        el.resourceContractTo.value = "";
+      }
+    }
+    if (data && isMaterial) {
+      el.resourceQuantity.value = data.quantity || "";
+    }
+  }
+
+  function getPersonBuiltinData() {
+    if (el.resourceType.value !== "person") return {};
+    var data = {
+      phone: el.resourcePhone.value.trim(),
+      email: el.resourceEmail.value.trim(),
+      contract: el.resourceContract.value
+    };
+    if (data.contract === "determinato") {
+      data.contractPeriod = {
+        from: el.resourceContractFrom.value,
+        to: el.resourceContractTo.value
+      };
+    }
+    return data;
+  }
+
+  function renderResourceCustomFields(customData) {
+    var type = el.resourceType.value;
+    var fields = getFieldsForType(type);
+    var data = customData || {};
+    if (!fields.length) {
+      el.resourceCustomFields.innerHTML = "";
+      return;
+    }
+    el.resourceCustomFields.innerHTML = fields.map(function (f) {
+      return '<label>' + escapeHtml(f.label) +
+        '<input type="text" autocomplete="off" data-custom-field="' + f.id + '" value="' + escapeHtml(data[f.id] || "") + '">' +
+        '</label>';
+    }).join("");
+  }
+
+  function getResourceCustomFieldValues() {
+    var data = {};
+    Array.prototype.slice.call(el.resourceCustomFields.querySelectorAll("[data-custom-field]")).forEach(function (input) {
+      var val = input.value.trim();
+      if (val) {
+        data[input.getAttribute("data-custom-field")] = val;
+      }
+    });
+    return data;
+  }
+
+  function renderCustomFieldManager() {
+    if (!RESOURCE_GROUPS.length) {
+      el.customFieldList.innerHTML = '<p class="show-assigned-empty">Nessun tipo disponibile</p>';
+      return;
+    }
+    var html = "";
+    RESOURCE_GROUPS.forEach(function (group) {
+      var fields = getFieldsForType(group.type);
+      if (!fields.length) return;
+      html += '<div class="custom-field-group"><strong>' + escapeHtml(group.label) + '</strong>';
+      html += '<div class="tag-list">' + fields.map(function (f) {
+        return '<span class="tag">' + escapeHtml(f.label) +
+          ' <button type="button" class="cat-delete-btn" data-delete-field="' + f.id + '" aria-label="Elimina" title="Elimina campo">&times;</button>' +
+          '</span>';
+      }).join("") + '</div></div>';
+    });
+    el.customFieldList.innerHTML = html || '<p class="show-assigned-empty">Nessun campo personalizzato</p>';
+  }
+
+  async function handleAddCustomField() {
+    var typeOptions = RESOURCE_GROUPS.map(function (g) { return g.label; });
+    var typeChoice = window.prompt("Per quale tipo? Scrivi uno tra:\n" + RESOURCE_GROUPS.map(function (g) { return "- " + g.label; }).join("\n"));
+    if (!typeChoice || !typeChoice.trim()) return;
+    typeChoice = typeChoice.trim();
+
+    var group = RESOURCE_GROUPS.filter(function (g) {
+      return g.label.toLowerCase() === typeChoice.toLowerCase();
+    })[0];
+    if (!group) {
+      window.alert("Tipo non trovato. Scrivi esattamente il nome del tipo.");
+      return;
+    }
+
+    var label = window.prompt("Nome del nuovo campo per \"" + group.label + "\":");
+    if (!label || !label.trim()) return;
+    label = label.trim();
+
+    var fieldId = group.type + "_" + label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+    var exists = state.customFields.some(function (f) { return f.id === fieldId; });
+    if (exists) {
+      window.alert("Esiste già un campo con questo nome per questo tipo.");
+      return;
+    }
+
+    var field = { id: fieldId, type: group.type, label: label };
+    state.customFields.push(field);
+    await state.storage.put("customFields", field);
+    renderCustomFieldManager();
+    renderResourceCustomFields();
+  }
+
+  async function deleteCustomField(fieldId) {
+    if (!window.confirm("Eliminare questo campo personalizzato?")) return;
+    state.customFields = state.customFields.filter(function (f) { return f.id !== fieldId; });
+    await state.storage.delete("customFields", fieldId);
+    renderCustomFieldManager();
+    renderResourceCustomFields();
   }
 
   function populateShowOptions(selectedShowId) {
@@ -1935,9 +2784,34 @@
     row.className = "event-date-row";
     row.innerHTML =
       '<input type="datetime-local" data-event-date required>' +
+      '<span class="event-end-time" data-event-end></span>' +
       '<button class="button button-muted button-icon" type="button" data-remove-event-date aria-label="Rimuovi data" title="Rimuovi data">&times;</button>';
-    row.querySelector("[data-event-date]").value = date ? dateTimeInputValue(date) : dateTimeInputValue(nextQuarterHour(new Date()));
+    var input = row.querySelector("[data-event-date]");
+    input.value = date ? dateTimeInputValue(date) : dateTimeInputValue(nextQuarterHour(new Date()));
+    input.addEventListener("change", updateEventEndTimes);
     el.eventDateList.appendChild(row);
+    updateEventEndTimes();
+  }
+
+  function updateEventEndTimes() {
+    var show = findShow(el.eventShow.value);
+    var duration = show && show.duration ? show.duration : 0;
+    Array.prototype.slice.call(el.eventDateList.querySelectorAll(".event-date-row")).forEach(function (row) {
+      var input = row.querySelector("[data-event-date]");
+      var label = row.querySelector("[data-event-end]");
+      if (!label) return;
+      if (!duration || !input.value) {
+        label.textContent = "";
+        return;
+      }
+      var start = inputDateTimeLocal(input.value);
+      if (isNaN(start.getTime())) {
+        label.textContent = "";
+        return;
+      }
+      var end = new Date(start.getTime() + duration * 60000);
+      label.textContent = "Fine: " + formatTime(end);
+    });
   }
 
   function populateRoomOptions() {
@@ -1954,20 +2828,29 @@
     var conflicts = [];
 
     state.events.forEach(function (event, index) {
-      var roomUnavailable = findRoomUnavailability(event);
-      if (roomUnavailable) {
-        conflicts.push({
-          title: "Sala non disponibile: " + roomName(event.roomId),
-          detail: eventTitle(event) + " / " + formatPeriodRange(roomUnavailable)
-        });
+      if (event.roomId) {
+        var roomUnavailable = findRoomUnavailability(event);
+        if (roomUnavailable) {
+          conflicts.push({
+            title: "Sala non disponibile: " + roomName(event.roomId),
+            detail: eventTitle(event) + " / " + formatPeriodRange(roomUnavailable)
+          });
+        }
       }
 
       findResourceUnavailabilityConflicts(event, eventResourceIds(event)).forEach(function (period) {
         var resource = findResource(period.targetId);
-        conflicts.push({
-          title: "Risorsa non disponibile: " + (resource ? resource.name : period.targetId),
-          detail: eventTitle(event) + " / " + formatPeriodRange(period)
-        });
+        if (period._contractConflict) {
+          conflicts.push({
+            title: "Fuori contratto: " + (resource ? resource.name : period.targetId),
+            detail: eventTitle(event) + " / Contratto: " + (period._contractFrom || "?") + " — " + (period._contractTo || "?")
+          });
+        } else {
+          conflicts.push({
+            title: "Risorsa non disponibile: " + (resource ? resource.name : period.targetId),
+            detail: eventTitle(event) + " / " + formatPeriodRange(period)
+          });
+        }
       });
 
       state.events.slice(index + 1).forEach(function (other) {
@@ -2044,9 +2927,37 @@
       return null;
     }
 
+    var resource = findResource(resourceId);
+    if (resource && isResourceOutsideContract(resource, event)) {
+      return {
+        _contractConflict: true,
+        _contractFrom: resource.contractPeriod.from,
+        _contractTo: resource.contractPeriod.to
+      };
+    }
+
     return targetUnavailability("resource", resourceId).filter(function (period) {
       return periodOverlapsEvent(period, event);
     })[0] || null;
+  }
+
+  function isResourceOutsideContract(resource, event) {
+    if (!resource || resource.type !== "person" || resource.contract !== "determinato" || !resource.contractPeriod) {
+      return false;
+    }
+    var cp = resource.contractPeriod;
+    if (!cp.from && !cp.to) return false;
+    var eventDate = new Date(event.start);
+    var eventEnd = new Date(event.end || event.start);
+    if (cp.from) {
+      var contractStart = new Date(cp.from + "T00:00:00");
+      if (eventEnd < contractStart) return true;
+    }
+    if (cp.to) {
+      var contractEnd = new Date(cp.to + "T23:59:59");
+      if (eventDate > contractEnd) return true;
+    }
+    return false;
   }
 
   function findResourceUnavailabilityConflicts(candidate, resourceIds) {
@@ -2054,9 +2965,26 @@
       return [];
     }
 
-    return state.unavailability.filter(function (period) {
-      return period.targetType === "resource" && resourceIds.indexOf(period.targetId) !== -1 && periodOverlapsEvent(period, candidate);
+    var conflicts = state.unavailability.filter(function (period) {
+      return period.targetType === "resource" && resourceIds.indexOf(period.targetId) !== -1 && !period._auto && periodOverlapsEvent(period, candidate);
     });
+
+    resourceIds.forEach(function (resourceId) {
+      var resource = findResource(resourceId);
+      if (resource && isResourceOutsideContract(resource, candidate)) {
+        conflicts.push({
+          targetType: "resource",
+          targetId: resourceId,
+          start: candidate.start,
+          end: candidate.end,
+          _contractConflict: true,
+          _contractFrom: resource.contractPeriod.from,
+          _contractTo: resource.contractPeriod.to
+        });
+      }
+    });
+
+    return conflicts;
   }
 
   function eventsOverlap(a, b) {
@@ -2083,13 +3011,16 @@
 
   function exportData() {
     var data = {
-      version: 3,
+      version: 4,
       exportedAt: new Date().toISOString(),
       shows: state.shows,
       events: state.events,
       resources: state.resources,
       rooms: state.rooms,
-      unavailability: state.unavailability
+      unavailability: state.unavailability,
+      customCategories: state.customCategories,
+      customTypes: state.customTypes,
+      customFields: state.customFields
     };
     var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     var url = URL.createObjectURL(blob);
@@ -2126,6 +3057,11 @@
         state.resources = data.resources.map(normalizeResource);
         state.rooms = data.rooms.map(normalizeRoom);
         state.unavailability = Array.isArray(data.unavailability) ? data.unavailability.map(normalizeUnavailability).filter(Boolean) : [];
+        state.customCategories = Array.isArray(data.customCategories) ? data.customCategories : [];
+        state.customTypes = Array.isArray(data.customTypes) ? data.customTypes : [];
+        state.customFields = Array.isArray(data.customFields) ? data.customFields : [];
+        rebuildCategories();
+        rebuildTypes();
         ensureEventShows();
         sortData();
 
@@ -2147,7 +3083,19 @@
         await Promise.all(state.unavailability.map(function (row) {
           return state.storage.put("unavailability", row);
         }));
+        await Promise.all(state.customCategories.map(function (row) {
+          return state.storage.put("categories", row);
+        }));
+        await Promise.all(state.customTypes.map(function (row) {
+          return state.storage.put("types", row);
+        }));
+        await Promise.all(state.customFields.map(function (row) {
+          return state.storage.put("customFields", row);
+        }));
 
+        populateResourceFilterOptions();
+        populateTypeSelect();
+        updateCategoryOptions();
         renderAll();
       } catch (error) {
         window.alert("Impossibile importare il file JSON.");
@@ -2315,6 +3263,14 @@
   }
 
   function eventTitle(event) {
+    if (event.eventType === "prove") {
+      var pShow = eventShow(event);
+      return pShow ? "Prove: " + pShow.name : (event.title || "Prove");
+    }
+    if (event.eventType === "tournee") {
+      var tShow = eventShow(event);
+      return tShow ? tShow.name + " (Tournée)" : (event.title || "Tournée");
+    }
     var show = eventShow(event);
     return show ? show.name : (event.title || "Spettacolo");
   }
@@ -2374,13 +3330,12 @@
   }
 
   function groupLabel(type) {
-    if (type === "material") {
-      return "Materiali";
+    for (var i = 0; i < RESOURCE_GROUPS.length; i += 1) {
+      if (RESOURCE_GROUPS[i].type === type) {
+        return RESOURCE_GROUPS[i].label;
+      }
     }
-    if (type === "expense") {
-      return "Spese";
-    }
-    return "Persone";
+    return type;
   }
 
   function eventColor(event) {

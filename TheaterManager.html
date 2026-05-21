@@ -152,15 +152,65 @@
                 Descrizione
                 <textarea id="showDescription" rows="4"></textarea>
               </label>
-              <div class="detail-section form-section">
-                <h4>Risorse gestite</h4>
-                <div id="showResourceGrid" class="assignment-grid"></div>
+              <div class="form-grid form-grid-short">
+                <label>
+                  Durata spettacolo (minuti)
+                  <input id="showDuration" type="number" min="0" step="1" inputmode="numeric">
+                </label>
+                <label>
+                  Costo €
+                  <input id="showCost" type="number" min="0" step="0.01" inputmode="decimal">
+                </label>
               </div>
-              <label>
-                Costo €
-                <input id="showCost" type="number" min="0" step="0.01" inputmode="decimal">
-              </label>
+              <div class="detail-section form-section">
+                <h4>Risorse necessarie per categoria</h4>
+                <div id="showCategoryResources" class="form-grid form-grid-3"></div>
+              </div>
+              <div class="detail-section form-section">
+                <div class="section-heading-row">
+                  <h4>Risorse di default</h4>
+                  <button class="button button-muted" type="button" id="openResourcePicker">Assegna risorsa</button>
+                </div>
+                <div id="resourcePickerPanel" class="picker-panel hidden">
+                  <div id="showResourceGrid" class="assignment-grid"></div>
+                  <div class="form-actions" style="padding:12px">
+                    <button class="button button-muted" type="button" id="closeResourcePicker">Chiudi</button>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-section form-section">
+                <h4>Periodi</h4>
+                <div class="period-block">
+                  <label class="period-toggle"><input type="checkbox" checked data-period-toggle="prove"> Periodo Prove</label>
+                  <div class="form-grid" data-period-fields="prove">
+                    <label>dal<input id="showProveFrom" type="date"></label>
+                    <label>al<input id="showProveTo" type="date"></label>
+                  </div>
+                </div>
+                <div class="period-block">
+                  <label class="period-toggle"><input type="checkbox" checked data-period-toggle="allestimento"> Periodo Allestimento</label>
+                  <div class="form-grid" data-period-fields="allestimento">
+                    <label>dal<input id="showAllestimentoFrom" type="date"></label>
+                    <label>al<input id="showAllestimentoTo" type="date"></label>
+                  </div>
+                </div>
+                <div class="period-block">
+                  <label class="period-toggle"><input type="checkbox" checked data-period-toggle="spettacoli"> Periodo Spettacoli</label>
+                  <div class="form-grid" data-period-fields="spettacoli">
+                    <label>dal<input id="showSpettacoliFrom" type="date"></label>
+                    <label>al<input id="showSpettacoliTo" type="date"></label>
+                  </div>
+                </div>
+                <div class="period-block">
+                  <label class="period-toggle"><input type="checkbox" checked data-period-toggle="tournee"> Periodo Tournée</label>
+                  <div class="form-grid" data-period-fields="tournee">
+                    <label>dal<input id="showTourneeFrom" type="date"></label>
+                    <label>al<input id="showTourneeTo" type="date"></label>
+                  </div>
+                </div>
+              </div>
               <div class="form-actions">
+                <button class="button button-muted" type="button" id="cancelShowForm">Annulla</button>
                 <button class="button button-primary" type="submit">Salva spettacolo</button>
               </div>
             </form>
@@ -225,15 +275,17 @@
                 <div class="form-grid">
                   <label>
                     Tipo
-                    <select id="resourceType" required>
-                      <option value="person">Persone</option>
-                      <option value="material">Materiali</option>
-                      <option value="expense">Spese</option>
-                    </select>
+                    <div class="input-with-action">
+                      <select id="resourceType" required></select>
+                      <button class="button button-muted button-icon" type="button" id="addTypeButton" aria-label="Aggiungi tipo" title="Aggiungi tipo">+</button>
+                    </div>
                   </label>
                   <label>
                     Categoria
-                    <select id="resourceCategory" required></select>
+                    <div class="input-with-action">
+                      <select id="resourceCategory" required></select>
+                      <button class="button button-muted button-icon" type="button" id="addCategoryButton" aria-label="Aggiungi categoria" title="Aggiungi categoria">+</button>
+                    </div>
                   </label>
                 </div>
                 <div class="form-grid">
@@ -246,6 +298,40 @@
                     <input id="resourceCost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
                   </label>
                 </div>
+                <div id="personBuiltinFields" class="hidden">
+                  <div class="form-grid">
+                    <label>
+                      Telefono
+                      <input id="resourcePhone" type="tel" autocomplete="off" inputmode="numeric" pattern="[0-9]*">
+                    </label>
+                    <label>
+                      E-mail
+                      <input id="resourceEmail" type="email" autocomplete="off">
+                    </label>
+                  </div>
+                  <div class="form-grid" style="margin-top:12px">
+                    <label>
+                      Contratto
+                      <select id="resourceContract">
+                        <option value="indeterminato">Indeterminato</option>
+                        <option value="determinato">Determinato</option>
+                      </select>
+                    </label>
+                    <div id="contractDatesWrapper" class="form-grid hidden">
+                      <label>Dal<input id="resourceContractFrom" type="date"></label>
+                      <label>Al<input id="resourceContractTo" type="date"></label>
+                    </div>
+                  </div>
+                </div>
+                <div id="materialBuiltinFields" class="hidden">
+                  <div class="form-grid form-grid-short">
+                    <label>
+                      Quantità
+                      <input id="resourceQuantity" type="number" min="0" step="1" inputmode="numeric">
+                    </label>
+                  </div>
+                </div>
+                <div id="resourceCustomFields" class="form-grid"></div>
                 <label>
                   Note
                   <textarea id="resourceNotes" rows="3"></textarea>
@@ -255,6 +341,21 @@
                   <button class="button button-primary" type="submit">Salva risorsa</button>
                 </div>
               </form>
+              <div class="detail-section" id="fieldManager">
+                <div class="section-heading-row">
+                  <h4>Campi personalizzati per tipo</h4>
+                  <button class="button button-muted" type="button" id="addCustomFieldButton">Aggiungi campo</button>
+                </div>
+                <div id="customFieldList"></div>
+              </div>
+              <div class="detail-section hidden" id="typeManager">
+                <h4>Tipi personalizzati</h4>
+                <div id="customTypeList" class="tag-list"></div>
+              </div>
+              <div class="detail-section hidden" id="categoryManager">
+                <h4>Categorie personalizzate</h4>
+                <div id="customCategoryList" class="tag-list"></div>
+              </div>
             </div>
           </div>
 
@@ -333,7 +434,7 @@
                 </div>
               </div>
               <div class="guide-copy">
-                <p>Theater Manager organizza spettacoli, sale e risorse occupate durante la programmazione. I dati vengono salvati nel browser del Mac e possono essere esportati in JSON per backup o trasferimento.</p>
+                <p>Theater Manager organizza spettacoli, sale e risorse occupate durante la programmazione teatrale. I dati vengono salvati nel browser e possono essere esportati in JSON per backup o trasferimento. L'applicazione supporta tipi, categorie e campi personalizzati completamente configurabili.</p>
               </div>
             </article>
 
@@ -344,8 +445,10 @@
                 <p>La sezione Calendario mostra la programmazione in quattro viste: giorno, settimana, mese e anno. Usa i pulsanti freccia per cambiare periodo e il pulsante Oggi per tornare alla data corrente.</p>
                 <ul>
                   <li>Giorno e Settimana mostrano le fasce orarie dalla mattina alla notte.</li>
-                  <li>Mese mostra una panoramica degli spettacoli per data.</li>
+                  <li>Mese mostra una panoramica degli eventi per data.</li>
                   <li>Anno aiuta a individuare rapidamente i giorni con eventi programmati.</li>
+                  <li>Clicca su un giorno del calendario per inserire un nuovo evento scegliendo tra Spettacolo, Prove o Tourn&eacute;e.</li>
+                  <li>Clicca su un evento esistente per aprirne il dettaglio, modificarlo o eliminarlo.</li>
                 </ul>
               </div>
             </article>
@@ -353,12 +456,13 @@
             <article class="surface guide-chapter">
               <span class="chapter-number">02</span>
               <div>
-                <h3>Creare uno spettacolo</h3>
-                <p>Nella sezione Spettacoli premi Nuovo spettacolo e compila nome, descrizione, risorse gestite e costo €. Dal calendario puoi poi inserire lo spettacolo in una o piu date scegliendo sala e orario.</p>
+                <h3>Tipi di evento</h3>
+                <p>Quando inserisci un evento in calendario puoi scegliere tra tre tipologie, ciascuna con un proprio form dedicato.</p>
                 <ul>
-                  <li>Il calendario accetta solo spettacoli gia registrati nella sezione Spettacoli.</li>
-                  <li>La sala non puo essere usata da due spettacoli sovrapposti nello stesso orario.</li>
-                  <li>Cliccando su una data gia creata puoi modificare la programmazione o eliminarla.</li>
+                  <li><strong>Spettacolo</strong> — seleziona lo spettacolo di riferimento, una o pi&ugrave; date con orario di inizio, e la sala. L'ora di fine viene calcolata automaticamente dalla durata dello spettacolo. Le risorse di default dello spettacolo vengono copiate su ogni data.</li>
+                  <li><strong>Prove</strong> — seleziona lo spettacolo di riferimento, una data, l'orario di inizio e fine (dalle ore / alle ore), la sala e le risorse impiegate tramite checkbox. Le prove appaiono in calendario con il titolo "Prove: Nome Spettacolo".</li>
+                  <li><strong>Tourn&eacute;e</strong> — seleziona solo lo spettacolo di riferimento. Non richiede sala n&eacute; date specifiche. Le tourn&eacute;e appaiono in calendario con il titolo "Nome Spettacolo (Tourn&eacute;e)".</li>
+                  <li>Tutti i tipi di evento richiedono almeno uno spettacolo registrato. Se non ne esiste nessuno, viene mostrato un avviso.</li>
                 </ul>
               </div>
             </article>
@@ -366,14 +470,16 @@
             <article class="surface guide-chapter">
               <span class="chapter-number">03</span>
               <div>
-                <h3>Gestire sale e risorse</h3>
-                <p>Nella sezione Sale puoi creare, modificare ed eliminare le sale. Nella sezione Risorse puoi gestire persone, materiali e spese. Le categorie disponibili sono elettricisti, macchinisti, audiovisivi, costumi e sala.</p>
+                <h3>Creare uno spettacolo</h3>
+                <p>Nella sezione Spettacoli premi Nuovo spettacolo per aprire il modulo di creazione. Per chiuderlo senza salvare, usa il pulsante Annulla.</p>
                 <ul>
-                  <li>Le sale hanno nome e capienza.</li>
-                  <li>Le risorse hanno tipo, categoria, nome, costo e note.</li>
-                  <li>Il pulsante Impegni mostra quando e in quali spettacoli viene usata ogni risorsa o sala.</li>
-                  <li>Il pulsante Indisponibilita permette di bloccare una risorsa o una sala tra data/ora di inizio e data/ora di fine.</li>
-                  <li>Una risorsa eliminata viene rimossa anche dagli spettacoli e dalle date in calendario a cui era assegnata.</li>
+                  <li><strong>Nome e Descrizione</strong> — identificano lo spettacolo.</li>
+                  <li><strong>Durata spettacolo</strong> — durata in minuti, affiancata al campo Costo &euro;. La durata viene usata per calcolare automaticamente l'ora di fine quando si inserisce lo spettacolo in calendario.</li>
+                  <li><strong>Risorse necessarie per categoria</strong> — indica quante risorse servono per ogni categoria (Audiovisivi, Elettricisti, Macchinisti, Sartoria, Attrezzeria, Direzione di Scena e eventuali categorie personalizzate). Il contatore mostra in tempo reale quante risorse sono state assegnate rispetto al necessario (es. "1/2 — da assegnare 1").</li>
+                  <li><strong>Risorse di default</strong> — premi Assegna risorsa per aprire il pannello di selezione con le risorse raggruppate per tipo. Le risorse assegnate appaiono in elenco con il pulsante × per rimuoverle singolarmente. Queste risorse vengono copiate su ogni nuova data in calendario.</li>
+                  <li><strong>Periodi</strong> — quattro periodi configurabili (Prove, Allestimento, Spettacoli, Tournée). Ogni periodo ha un checkbox di abilitazione: se deselezionato, i campi dal/al vengono disabilitati e svuotati.</li>
+                  <li>Il calendario accetta solo spettacoli già registrati nella sezione Spettacoli.</li>
+                  <li>La sala non può essere usata da due spettacoli sovrapposti nello stesso orario.</li>
                 </ul>
               </div>
             </article>
@@ -381,14 +487,17 @@
             <article class="surface guide-chapter">
               <span class="chapter-number">04</span>
               <div>
-                <h3>Assegnare risorse allo spettacolo</h3>
-                <p>Le risorse dello spettacolo si scelgono nella scheda Spettacoli, nel campo Risorse gestite. Queste sono le risorse predefinite: quando inserisci lo spettacolo in calendario, ogni data riceve una propria copia iniziale di quelle risorse.</p>
+                <h3>Gestire sale e risorse</h3>
+                <p>Nella sezione Sale puoi creare, modificare ed eliminare le sale. Nella sezione Risorse puoi gestire le risorse con tipo, categoria, nome, costo, note e campi personalizzati.</p>
                 <ul>
-                  <li>Puoi assegnare piu persone, materiali e spese allo stesso spettacolo.</li>
-                  <li>Le risorse selezionate nella scheda Spettacoli vengono usate come base per le nuove date in calendario.</li>
-                  <li>Aprendo una data dal calendario puoi usare Gestisci risorse per modificare le risorse solo di quella specifica data.</li>
-                  <li>Lo stesso spettacolo puo quindi avere risorse diverse in giorni diversi.</li>
-                  <li>Se una risorsa e occupata o non disponibile nello stesso orario, il sistema segnala un conflitto.</li>
+                  <li>Le sale hanno nome e capienza.</li>
+                  <li>Le risorse hanno tipo, categoria, nome, costo € e note.</li>
+                  <li><strong>Persone</strong> — hanno campi aggiuntivi: Telefono (solo numeri), E-mail e Contratto (Indeterminato o Determinato). Se il contratto è Determinato si inserisce il periodo Dal/Al.</li>
+                  <li><strong>Contratto determinato</strong> — la risorsa è disponibile solo durante il periodo contrattuale. Se viene assegnata a uno spettacolo con date fuori dal contratto, il sistema segnala automaticamente un conflitto "Fuori contratto" nel picker di assegnazione e nella sezione Dati. I periodi di indisponibilità vengono gestiti in automatico e non appaiono nella lista "Non disponibile".</li>
+                  <li><strong>Materiali</strong> — hanno un campo aggiuntivo Quantità.</li>
+                  <li>Il pulsante Impegni mostra quando e in quali spettacoli viene usata ogni risorsa o sala.</li>
+                  <li>Il pulsante Indisponibilità permette di bloccare una risorsa o una sala tra data/ora di inizio e data/ora di fine.</li>
+                  <li>Una risorsa eliminata viene rimossa anche dagli spettacoli e dalle date in calendario a cui era assegnata.</li>
                 </ul>
               </div>
             </article>
@@ -396,14 +505,14 @@
             <article class="surface guide-chapter">
               <span class="chapter-number">05</span>
               <div>
-                <h3>Controllare conflitti e agenda</h3>
-                <p>La sezione Dati mostra i conflitti attivi e i prossimi spettacoli. I conflitti segnalano sale o risorse sovrapposte nello stesso intervallo orario.</p>
+                <h3>Tipi, categorie e campi personalizzati</h3>
+                <p>Oltre ai tipi predefiniti (Persone, Materiali, Spese) e alle categorie predefinite (Audiovisivi, Elettricisti, Macchinisti, Sartoria, Attrezzeria, Direzione di Scena), puoi crearne di nuovi.</p>
                 <ul>
-                  <li>Se un conflitto appare, apri la data in calendario e cambia sala, orario o risorse.</li>
-                  <li>Le risorse modificate con Gestisci risorse valgono solo per quella data specifica.</li>
-                  <li>Una sala o risorsa non disponibile in un orario gia programmato viene segnalata tra i conflitti.</li>
-                  <li>L'elenco dei prossimi spettacoli permette di aprire rapidamente il dettaglio.</li>
-                  <li>La ricerca in alto filtra spettacoli, sale e risorse.</li>
+                  <li><strong>Aggiungere un tipo</strong> — nel form risorsa, premi il pulsante + accanto al campo Tipo e inserisci il nome. I tipi personalizzati appaiono nella sezione "Tipi personalizzati" e si eliminano con ×.</li>
+                  <li><strong>Aggiungere una categoria</strong> — nel form risorsa, premi il pulsante + accanto al campo Categoria e inserisci il nome. Le categorie personalizzate appaiono nella sezione "Categorie personalizzate" e si eliminano con ×.</li>
+                  <li><strong>Campi personalizzati per tipo</strong> — premi Aggiungi campo, scegli il tipo e inserisci il nome del campo (es. Telefono, Email per le Persone). I campi appaiono automaticamente nel form risorsa quando si seleziona quel tipo e i valori vengono mostrati nell'elenco risorse.</li>
+                  <li>Tipi e categorie in uso da almeno una risorsa non possono essere eliminati.</li>
+                  <li>Tutti i tipi e le categorie personalizzate funzionano ovunque: filtri, raggruppamenti, form spettacolo e calendario.</li>
                 </ul>
               </div>
             </article>
@@ -411,11 +520,45 @@
             <article class="surface guide-chapter">
               <span class="chapter-number">06</span>
               <div>
+                <h3>Assegnare risorse allo spettacolo</h3>
+                <p>Le risorse di default dello spettacolo si scelgono nella scheda Spettacoli premendo il pulsante Assegna risorsa. Quando modifichi uno spettacolo, il pannello risorse si apre automaticamente. Quando inserisci lo spettacolo in calendario, ogni data riceve una copia iniziale di quelle risorse.</p>
+                <ul>
+                  <li>Puoi assegnare pi&ugrave; persone, materiali, spese e qualsiasi tipo personalizzato allo stesso spettacolo.</li>
+                  <li>Le risorse di default vengono usate come base per ogni nuova data in calendario.</li>
+                  <li>Aprendo una data dal calendario puoi usare Gestisci risorse per modificare le risorse solo di quella specifica data.</li>
+                  <li>Lo stesso spettacolo pu&ograve; quindi avere risorse diverse in giorni diversi.</li>
+                  <li>Se una risorsa &egrave; occupata o non disponibile nello stesso orario, il sistema mostra un avviso con i pulsanti <strong>Verifica</strong> e <strong>Salva comunque</strong>.</li>
+                  <li><strong>Verifica</strong> apre un popup con il dettaglio di ogni risorsa in conflitto: nome, motivo (occupata da un altro evento, fuori contratto, non disponibile) e date.</li>
+                  <li><strong>Salva comunque</strong> permette di forzare il salvataggio anche in presenza di conflitti risorse.</li>
+                  <li>Per le risorse con contratto determinato, il popup mostra il periodo del contratto e segnala che l'evento cade fuori da tale periodo.</li>
+                  <li>I conflitti sala (sala occupata o non disponibile) bloccano sempre il salvataggio e non possono essere forzati.</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="surface guide-chapter">
+              <span class="chapter-number">07</span>
+              <div>
+                <h3>Controllare conflitti e agenda</h3>
+                <p>La sezione Dati mostra i conflitti attivi e i prossimi spettacoli. I conflitti segnalano sale o risorse sovrapposte nello stesso intervallo orario.</p>
+                <ul>
+                  <li>Se un conflitto appare, apri la data in calendario e cambia sala, orario o risorse.</li>
+                  <li>Le risorse modificate con Gestisci risorse valgono solo per quella data specifica.</li>
+                  <li>Una sala o risorsa non disponibile in un orario già programmato viene segnalata tra i conflitti.</li>
+                  <li>L'elenco dei prossimi spettacoli permette di aprire rapidamente il dettaglio.</li>
+                  <li>La ricerca in alto filtra spettacoli, sale e risorse.</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="surface guide-chapter">
+              <span class="chapter-number">08</span>
+              <div>
                 <h3>Salvataggio e backup</h3>
-                <p>I dati sono salvati automaticamente nel database locale del browser. Usa Esporta JSON per creare un backup e Importa JSON per ripristinare o spostare l'archivio su un altro Mac.</p>
+                <p>I dati sono salvati automaticamente nel database locale del browser. Usa Esporta JSON per creare un backup e Importa JSON per ripristinare o spostare l'archivio.</p>
                 <ul>
                   <li>L'importazione sostituisce i dati locali con quelli del file scelto.</li>
-                  <li>Il backup conserva spettacoli, colori, sale, risorse e periodi di indisponibilita.</li>
+                  <li>Il backup conserva spettacoli, sale, risorse, tipi, categorie, campi personalizzati e periodi di indisponibilità.</li>
                   <li>Per sicurezza, esporta un JSON prima di modifiche importanti alla programmazione.</li>
                 </ul>
               </div>
@@ -435,18 +578,52 @@
         <form class="stack-form" id="eventForm">
           <input type="hidden" id="eventId">
           <label>
-            Spettacolo
-            <select id="eventShow" required></select>
+            Tipo evento
+            <select id="eventType">
+              <option value="spettacolo">Spettacolo</option>
+              <option value="prove">Prove</option>
+              <option value="tournee">Tourn&eacute;e</option>
+            </select>
           </label>
-          <label>
-            Date e orari
-            <span id="eventDateList" class="event-date-list"></span>
-          </label>
-          <button class="button button-muted" type="button" id="addEventDateButton">Aggiungi data</button>
-          <label>
-            Sala
-            <select id="eventRoom" required></select>
-          </label>
+          <div id="eventShowGroup">
+            <label>
+              Spettacolo
+              <select id="eventShow" required></select>
+            </label>
+          </div>
+          <div id="eventDateGroup">
+            <label>
+              Date e orari
+              <span id="eventDateList" class="event-date-list"></span>
+            </label>
+            <button class="button button-muted" type="button" id="addEventDateButton">Aggiungi data</button>
+          </div>
+          <div id="eventProveTimeGroup" class="hidden">
+            <label>
+              Data
+              <input type="date" id="eventProveDate">
+            </label>
+            <div class="form-grid">
+              <label>
+                Dalle ore
+                <input type="time" id="eventProveFrom">
+              </label>
+              <label>
+                Alle ore
+                <input type="time" id="eventProveTo">
+              </label>
+            </div>
+          </div>
+          <div id="eventRoomGroup">
+            <label>
+              Sala
+              <select id="eventRoom" required></select>
+            </label>
+          </div>
+          <div id="eventProveResourceGroup" class="hidden">
+            <label>Risorse impiegate</label>
+            <div id="eventProveResourceList" class="picker-panel"></div>
+          </div>
           <p class="form-error" id="eventFormError" aria-live="polite"></p>
           <div class="form-actions">
             <button class="button button-muted" type="button" data-close-modal>Annulla</button>
