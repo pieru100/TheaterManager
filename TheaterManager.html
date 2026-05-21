@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Theater Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navigazione principale">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" focusable="false">
+              <path d="M8 19h32l-16-10-16 10Z"></path>
+              <path d="M11 19v19h26V19"></path>
+              <path d="M15 38V24m6 14V24m6 14V24m6 14V24"></path>
+              <path d="M18 14h12"></path>
+              <path d="M9 38h30"></path>
+            </svg>
+          </div>
+          <div>
+            <h1>Theater Manager</h1>
+            <p>Direzione teatro</p>
+          </div>
+        </div>
+
+        <nav class="side-nav">
+          <button class="nav-button is-active" type="button" data-section="calendar" aria-current="page">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                <path d="M8 2v4M16 2v4M3 10h18"></path>
+              </svg>
+            </span>
+            Calendario
+          </button>
+          <button class="nav-button" type="button" data-section="shows">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V8Z"></path>
+                <path d="M13 6v14M7 10h3M7 14h3M16 10h1M16 14h1"></path>
+              </svg>
+            </span>
+            Spettacoli
+          </button>
+          <button class="nav-button" type="button" data-section="rooms">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M5 21h14M7 21V5a2 2 0 0 1 2-2h8v18"></path>
+                <path d="M10 12h.01"></path>
+              </svg>
+            </span>
+            Sale
+          </button>
+          <button class="nav-button" type="button" data-section="resources">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+              </svg>
+            </span>
+            Risorse
+          </button>
+          <button class="nav-button" type="button" data-section="archive">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <ellipse cx="12" cy="5" rx="8" ry="3"></ellipse>
+                <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path>
+                <path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path>
+              </svg>
+            </span>
+            Dati
+          </button>
+          <button class="nav-button" type="button" data-section="guide">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M9.5 9a2.7 2.7 0 0 1 5.1 1.2c0 1.8-1.6 2.3-2.3 3.3M12 17h.01"></path>
+              </svg>
+            </span>
+            Guida
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="storageStatus">DB locale attivo</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Gestionale teatro</p>
+            <h2 id="pageTitle">Calendario</h2>
+          </div>
+          <div class="top-actions">
+            <label class="search-field">
+              <span class="sr-only">Cerca</span>
+              <input id="globalSearch" type="search" placeholder="Cerca spettacoli, sale, risorse">
+            </label>
+            <button class="button button-primary" type="button" id="addEventButton">Inserisci in calendario</button>
+          </div>
+        </header>
+
+        <section class="section-panel is-active" data-section-panel="calendar">
+          <div class="metrics" id="metrics"></div>
+
+          <div class="surface calendar-surface">
+            <div class="calendar-toolbar">
+              <div class="date-nav">
+                <button class="icon-button" type="button" id="previousPeriod" aria-label="Periodo precedente">&lsaquo;</button>
+                <button class="button button-muted" type="button" id="todayButton">Oggi</button>
+                <button class="icon-button" type="button" id="nextPeriod" aria-label="Periodo successivo">&rsaquo;</button>
+              </div>
+
+              <div class="period-title" id="periodTitle"></div>
+
+              <div class="segmented-control" role="group" aria-label="Vista calendario">
+                <button class="segment is-active" type="button" data-view="day">Giorno</button>
+                <button class="segment" type="button" data-view="week">Settimana</button>
+                <button class="segment" type="button" data-view="month">Mese</button>
+                <button class="segment" type="button" data-view="year">Anno</button>
+              </div>
+            </div>
+
+            <div class="calendar-root" id="calendarRoot"></div>
+          </div>
+        </section>
+
+        <section class="section-panel" data-section-panel="shows">
+          <div class="surface">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Anagrafica</p>
+                <h3>Spettacoli</h3>
+              </div>
+              <button class="button button-primary" type="button" id="addShowButton" aria-controls="showForm" aria-expanded="false">Nuovo spettacolo</button>
+            </div>
+            <form class="stack-form hidden" id="showForm">
+              <input type="hidden" id="showId">
+              <label>
+                Nome spettacolo
+                <input id="showName" type="text" autocomplete="off" required>
+              </label>
+              <label>
+                Descrizione
+                <textarea id="showDescription" rows="4"></textarea>
+              </label>
+              <div class="detail-section form-section">
+                <h4>Risorse gestite</h4>
+                <div id="showResourceGrid" class="assignment-grid"></div>
+              </div>
+              <label>
+                Costo €
+                <input id="showCost" type="number" min="0" step="0.01" inputmode="decimal">
+              </label>
+              <div class="form-actions">
+                <button class="button button-primary" type="submit">Salva spettacolo</button>
+              </div>
+            </form>
+            <div id="showList" class="resource-list"></div>
+          </div>
+        </section>
+
+        <section class="section-panel" data-section-panel="rooms">
+          <div class="resource-layout room-management-layout">
+            <div class="surface">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Anagrafica</p>
+                  <h3>Sale</h3>
+                </div>
+                <button class="button button-muted" type="button" id="resetRoomForm" aria-controls="roomForm" aria-expanded="false">Nuova sala</button>
+              </div>
+
+              <form class="stack-form hidden" id="roomForm">
+                <input type="hidden" id="roomId">
+                <div class="form-grid">
+                  <label>
+                    Nome sala
+                    <input id="roomName" type="text" autocomplete="off" required>
+                  </label>
+                  <label>
+                    Capienza
+                    <input id="roomCapacity" type="number" min="0" step="1" inputmode="numeric">
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <button class="button button-muted" type="button" id="cancelRoomForm">Annulla</button>
+                  <button class="button button-primary" type="submit">Salva sala</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="surface">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Sale</p>
+                  <h3>Sale registrate</h3>
+                </div>
+              </div>
+              <div id="roomList" class="resource-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-panel" data-section-panel="resources">
+          <div class="resource-layout resource-management-layout">
+            <div class="surface">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Archivio</p>
+                  <h3>Risorse</h3>
+                </div>
+                <button class="button button-muted" type="button" id="resetResourceForm" aria-controls="resourceForm" aria-expanded="false">Nuova risorsa</button>
+              </div>
+              <form class="stack-form hidden" id="resourceForm">
+                <input type="hidden" id="resourceId">
+                <div class="form-grid">
+                  <label>
+                    Tipo
+                    <select id="resourceType" required>
+                      <option value="person">Persone</option>
+                      <option value="material">Materiali</option>
+                      <option value="expense">Spese</option>
+                    </select>
+                  </label>
+                  <label>
+                    Categoria
+                    <select id="resourceCategory" required></select>
+                  </label>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    Nome risorsa
+                    <input id="resourceName" type="text" autocomplete="off" required>
+                  </label>
+                  <label>
+                    Costo €
+                    <input id="resourceCost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+                  </label>
+                </div>
+                <label>
+                  Note
+                  <textarea id="resourceNotes" rows="3"></textarea>
+                </label>
+                <div class="form-actions">
+                  <button class="button button-muted" type="button" id="cancelResourceForm">Annulla</button>
+                  <button class="button button-primary" type="submit">Salva risorsa</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="resource-layout resource-management-layout">
+            <div class="surface">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Elenco</p>
+                  <h3>Risorse disponibili</h3>
+                </div>
+                <div class="segmented-control resource-group-control" role="group" aria-label="Raggruppa risorse">
+                  <button class="segment is-active" type="button" data-resource-group="type">Tipo</button>
+                  <button class="segment" type="button" data-resource-group="category">Categoria</button>
+                </div>
+              </div>
+              <div class="resource-filter-bar" aria-label="Filtri risorse">
+                <label>
+                  Tipo
+                  <select id="resourceFilterType"></select>
+                </label>
+                <label>
+                  Categoria
+                  <select id="resourceFilterCategory"></select>
+                </label>
+              </div>
+              <div id="resourceList" class="resource-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-panel" data-section-panel="archive">
+          <div class="archive-layout">
+            <div class="surface">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Database</p>
+                  <h3>Backup locale</h3>
+                </div>
+              </div>
+              <div class="data-actions">
+                <button class="button button-primary" type="button" id="exportDataButton">Esporta Database</button>
+                <button class="button button-muted" type="button" id="importDataButton">Importa Database</button>
+                <input class="hidden" id="importDataInput" type="file" accept="application/json,.json">
+              </div>
+            </div>
+
+            <div class="surface">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Controllo</p>
+                  <h3>Conflitti attivi</h3>
+                </div>
+              </div>
+              <div id="conflictList" class="conflict-list"></div>
+            </div>
+
+            <div class="surface">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Agenda</p>
+                  <h3>Prossimi spettacoli</h3>
+                </div>
+              </div>
+              <div id="upcomingList" class="upcoming-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-panel" data-section-panel="guide">
+          <div class="guide-layout">
+            <article class="surface guide-intro">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Manuale operativo</p>
+                  <h3>Come usare Theater Manager</h3>
+                </div>
+              </div>
+              <div class="guide-copy">
+                <p>Theater Manager organizza spettacoli, sale e risorse occupate durante la programmazione. I dati vengono salvati nel browser del Mac e possono essere esportati in JSON per backup o trasferimento.</p>
+              </div>
+            </article>
+
+            <article class="surface guide-chapter">
+              <span class="chapter-number">01</span>
+              <div>
+                <h3>Calendario</h3>
+                <p>La sezione Calendario mostra la programmazione in quattro viste: giorno, settimana, mese e anno. Usa i pulsanti freccia per cambiare periodo e il pulsante Oggi per tornare alla data corrente.</p>
+                <ul>
+                  <li>Giorno e Settimana mostrano le fasce orarie dalla mattina alla notte.</li>
+                  <li>Mese mostra una panoramica degli spettacoli per data.</li>
+                  <li>Anno aiuta a individuare rapidamente i giorni con eventi programmati.</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="surface guide-chapter">
+              <span class="chapter-number">02</span>
+              <div>
+                <h3>Creare uno spettacolo</h3>
+                <p>Nella sezione Spettacoli premi Nuovo spettacolo e compila nome, descrizione, risorse gestite e costo €. Dal calendario puoi poi inserire lo spettacolo in una o piu date scegliendo sala e orario.</p>
+                <ul>
+                  <li>Il calendario accetta solo spettacoli gia registrati nella sezione Spettacoli.</li>
+                  <li>La sala non puo essere usata da due spettacoli sovrapposti nello stesso orario.</li>
+                  <li>Cliccando su una data gia creata puoi modificare la programmazione o eliminarla.</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="surface guide-chapter">
+              <span class="chapter-number">03</span>
+              <div>
+                <h3>Gestire sale e risorse</h3>
+                <p>Nella sezione Sale puoi creare, modificare ed eliminare le sale. Nella sezione Risorse puoi gestire persone, materiali e spese. Le categorie disponibili sono elettricisti, macchinisti, audiovisivi, costumi e sala.</p>
+                <ul>
+                  <li>Le sale hanno nome e capienza.</li>
+                  <li>Le risorse hanno tipo, categoria, nome, costo e note.</li>
+                  <li>Il pulsante Impegni mostra quando e in quali spettacoli viene usata ogni risorsa o sala.</li>
+                  <li>Il pulsante Indisponibilita permette di bloccare una risorsa o una sala tra data/ora di inizio e data/ora di fine.</li>
+                  <li>Una risorsa eliminata viene rimossa anche dagli spettacoli e dalle date in calendario a cui era assegnata.</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="surface guide-chapter">
+              <span class="chapter-number">04</span>
+              <div>
+                <h3>Assegnare risorse allo spettacolo</h3>
+                <p>Le risorse dello spettacolo si scelgono nella scheda Spettacoli, nel campo Risorse gestite. Queste sono le risorse predefinite: quando inserisci lo spettacolo in calendario, ogni data riceve una propria copia iniziale di quelle risorse.</p>
+                <ul>
+                  <li>Puoi assegnare piu persone, materiali e spese allo stesso spettacolo.</li>
+                  <li>Le risorse selezionate nella scheda Spettacoli vengono usate come base per le nuove date in calendario.</li>
+                  <li>Aprendo una data dal calendario puoi usare Gestisci risorse per modificare le risorse solo di quella specifica data.</li>
+                  <li>Lo stesso spettacolo puo quindi avere risorse diverse in giorni diversi.</li>
+                  <li>Se una risorsa e occupata o non disponibile nello stesso orario, il sistema segnala un conflitto.</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="surface guide-chapter">
+              <span class="chapter-number">05</span>
+              <div>
+                <h3>Controllare conflitti e agenda</h3>
+                <p>La sezione Dati mostra i conflitti attivi e i prossimi spettacoli. I conflitti segnalano sale o risorse sovrapposte nello stesso intervallo orario.</p>
+                <ul>
+                  <li>Se un conflitto appare, apri la data in calendario e cambia sala, orario o risorse.</li>
+                  <li>Le risorse modificate con Gestisci risorse valgono solo per quella data specifica.</li>
+                  <li>Una sala o risorsa non disponibile in un orario gia programmato viene segnalata tra i conflitti.</li>
+                  <li>L'elenco dei prossimi spettacoli permette di aprire rapidamente il dettaglio.</li>
+                  <li>La ricerca in alto filtra spettacoli, sale e risorse.</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="surface guide-chapter">
+              <span class="chapter-number">06</span>
+              <div>
+                <h3>Salvataggio e backup</h3>
+                <p>I dati sono salvati automaticamente nel database locale del browser. Usa Esporta JSON per creare un backup e Importa JSON per ripristinare o spostare l'archivio su un altro Mac.</p>
+                <ul>
+                  <li>L'importazione sostituisce i dati locali con quelli del file scelto.</li>
+                  <li>Il backup conserva spettacoli, colori, sale, risorse e periodi di indisponibilita.</li>
+                  <li>Per sicurezza, esporta un JSON prima di modifiche importanti alla programmazione.</li>
+                </ul>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-layer hidden" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
+      <div class="modal">
+        <button class="modal-close" type="button" data-close-modal aria-label="Chiudi">&times;</button>
+        <div class="modal-heading">
+          <p class="eyebrow">Calendario</p>
+          <h3 id="eventModalTitle">Inserisci in calendario</h3>
+        </div>
+        <form class="stack-form" id="eventForm">
+          <input type="hidden" id="eventId">
+          <label>
+            Spettacolo
+            <select id="eventShow" required></select>
+          </label>
+          <label>
+            Date e orari
+            <span id="eventDateList" class="event-date-list"></span>
+          </label>
+          <button class="button button-muted" type="button" id="addEventDateButton">Aggiungi data</button>
+          <label>
+            Sala
+            <select id="eventRoom" required></select>
+          </label>
+          <p class="form-error" id="eventFormError" aria-live="polite"></p>
+          <div class="form-actions">
+            <button class="button button-muted" type="button" data-close-modal>Annulla</button>
+            <button class="button button-primary" type="submit">Salva in calendario</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-layer hidden" id="eventDetailModal" role="dialog" aria-modal="true" aria-labelledby="eventDetailTitle">
+      <div class="modal modal-wide">
+        <button class="modal-close" type="button" data-close-modal aria-label="Chiudi">&times;</button>
+        <div id="eventDetailBody"></div>
+      </div>
+    </div>
+
+    <div class="modal-layer hidden" id="resourceScheduleModal" role="dialog" aria-modal="true" aria-labelledby="resourceScheduleTitle">
+      <div class="modal modal-wide">
+        <button class="modal-close" type="button" data-close-modal aria-label="Chiudi">&times;</button>
+        <div id="resourceScheduleBody"></div>
+      </div>
+    </div>
+
+    <div class="modal-layer hidden" id="unavailabilityModal" role="dialog" aria-modal="true" aria-labelledby="unavailabilityTitle">
+      <div class="modal modal-wide">
+        <button class="modal-close" type="button" data-close-modal aria-label="Chiudi">&times;</button>
+        <div class="modal-heading">
+          <p class="eyebrow">Disponibilita</p>
+          <h3 id="unavailabilityTitle">Indisponibilita</h3>
+        </div>
+        <form id="unavailabilityForm" class="stack-form">
+          <input type="hidden" id="unavailabilityId">
+          <input type="hidden" id="unavailabilityTargetType">
+          <input type="hidden" id="unavailabilityTargetId">
+          <div class="form-grid">
+            <label>
+              Data inizio
+              <input id="unavailabilityStartDate" type="date" required>
+            </label>
+            <label>
+              Ora inizio
+              <input id="unavailabilityStartTime" type="time" required>
+            </label>
+          </div>
+          <div class="form-grid">
+            <label>
+              Data fine
+              <input id="unavailabilityEndDate" type="date" required>
+            </label>
+            <label>
+              Ora fine
+              <input id="unavailabilityEndTime" type="time" required>
+            </label>
+          </div>
+          <label>
+            Motivo
+            <input id="unavailabilityReason" type="text" autocomplete="off" placeholder="Manutenzione, ferie, allestimento">
+          </label>
+          <p class="form-error" id="unavailabilityError" aria-live="polite"></p>
+          <div class="form-actions">
+            <button class="button button-muted" type="button" id="resetUnavailabilityForm">Nuovo periodo</button>
+            <button class="button button-primary" type="submit">Salva indisponibilita</button>
+          </div>
+        </form>
+        <div class="detail-section">
+          <h4>Periodi registrati</h4>
+          <div id="unavailabilityList" class="unavailability-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-layer hidden" id="assignmentModal" role="dialog" aria-modal="true" aria-labelledby="assignmentTitle">
+      <div class="modal modal-wide">
+        <button class="modal-close" type="button" data-close-modal aria-label="Chiudi">&times;</button>
+        <div class="modal-heading">
+          <p class="eyebrow">Disponibilita</p>
+          <h3 id="assignmentTitle">Risorse spettacolo</h3>
+        </div>
+        <div id="assignmentSummary" class="assignment-summary"></div>
+        <form id="assignmentForm" class="assignment-form">
+          <div id="assignmentGrid" class="assignment-grid"></div>
+          <p class="form-error" id="assignmentError" aria-live="polite"></p>
+          <div class="form-actions">
+            <button class="button button-muted" type="button" data-close-modal>Annulla</button>
+            <button class="button button-primary" type="submit">Salva risorse</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
